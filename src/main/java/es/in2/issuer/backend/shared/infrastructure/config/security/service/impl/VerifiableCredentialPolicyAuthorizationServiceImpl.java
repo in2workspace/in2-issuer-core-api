@@ -226,9 +226,20 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
             return false;
         }
 
-        LEARCredentialEmployee.CredentialSubject.Mandate mandate = objectMapper.convertValue(payload, LEARCredentialEmployee.CredentialSubject.Mandate.class);
-        return mandate != null &&
-                mandate.mandator().organizationIdentifier().equals(extractMandatorLearCredentialEmployee(learCredential).organizationIdentifier())
+        LEARCredentialEmployee.CredentialSubject.Mandate mandate =
+                objectMapper.convertValue(payload, LEARCredentialEmployee.CredentialSubject.Mandate.class);
+
+        if (mandate == null || mandate.mandator() == null) {
+            return false;
+        }
+
+        String tokenMandatorOrgId = extractMandatorOrganizationIdentifier(learCredential);
+        log.debug("tokenMandatorOrgId: {}", tokenMandatorOrgId);
+        String payloadMandatorOrgId = mandate.mandator().organizationIdentifier();
+        log.debug("payloadMandatorOrgId: {}", payloadMandatorOrgId);
+
+        return tokenMandatorOrgId != null
+                && tokenMandatorOrgId.equals(payloadMandatorOrgId)
                 && payloadPowersOnlyIncludeProductOffering(mandate.power());
     }
 
@@ -236,18 +247,31 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
         if (!hasLearCredentialOnboardingExecutePower(extractPowers(learCredential))) {
             return false;
         }
-        LEARCredentialMachine.CredentialSubject.Mandate mandate = objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class);
-        if (mandate == null) {
+
+        LEARCredentialMachine.CredentialSubject.Mandate mandate =
+                objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class);
+
+        if (mandate == null || mandate.mandator() == null) {
             return false;
         }
-        final Mandator learCredentialMandator = extractMandatorLearCredentialEmployee(
-                learCredential);
-        final Mandate.Mandator payloadMandator = mandate.mandator();
-        return payloadMandator.organization().equals(learCredentialMandator.organization()) &&
-                payloadMandator.country().equals(learCredentialMandator.country()) &&
-                payloadMandator.commonName().equals(learCredentialMandator.commonName()) &&
-                payloadMandator.serialNumber().equals(learCredentialMandator.serialNumber()) &&
-                payloadPowersOnlyIncludeOnboarding(mandate.power());
+
+        Mandator tokenMandator = extractMandatorLearCredentialEmployee(learCredential);
+        if (tokenMandator == null) {
+            return false;
+        }
+
+        LEARCredentialMachine.CredentialSubject.Mandate.Mandator payloadMandator = mandate.mandator();
+
+        return equalsSafe(payloadMandator.organizationIdentifier(), tokenMandator.organizationIdentifier())
+                && equalsSafe(payloadMandator.organization(), tokenMandator.organization())
+                && equalsSafe(payloadMandator.country(), tokenMandator.country())
+                && equalsSafe(payloadMandator.commonName(), tokenMandator.commonName())
+                && equalsSafe(payloadMandator.serialNumber(), tokenMandator.serialNumber())
+                && payloadPowersOnlyIncludeOnboarding(mandate.power());
+    }
+
+    private boolean equalsSafe(String a, String b) {
+        return a != null && a.equals(b);
     }
 
     private Mono<Boolean> isVerifiableCertificationPolicyValid(LEARCredential learCredential, String idToken) {

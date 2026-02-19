@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [v2.2.14](https://github.com/in2workspace/in2-issuer-api/releases/tag/v2.2.14)
+### Fixed
+- Allow issuing LEARCredentialEmployee using an access token whose embedded VC is either LEARCredentialEmployee or LEARCredentialMachine (issuance policies).
+
 ## [v2.2.13](https://github.com/in2workspace/in2-issuer-api/releases/tag/v2.2.13)
 ### Changed
 - Create bitstring-encoded lists using MSB-first ordering.

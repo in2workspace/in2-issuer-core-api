@@ -12,7 +12,7 @@ plugins {
 
 group = 'es.in2'
 
-version = '2.2.13'
+version = '2.2.14'
 
 java {
     sourceCompatibility = '17'
