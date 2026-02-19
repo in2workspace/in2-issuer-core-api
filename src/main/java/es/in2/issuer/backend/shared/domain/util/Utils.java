@@ -13,6 +13,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
 
+import static es.in2.issuer.backend.shared.domain.util.Constants.LEAR_CREDENTIAL_EMPLOYEE;
+import static es.in2.issuer.backend.shared.domain.util.Constants.LEAR_CREDENTIAL_MACHINE;
+
 public final class Utils {
 
     private Utils() {
@@ -35,7 +38,7 @@ public final class Utils {
 
     public static Mandator extractMandatorLearCredentialEmployee(LEARCredential credential) {
         List<String> types = credential.type();
-        if (types.contains("LEARCredentialEmployee")) {
+        if (types.contains(LEAR_CREDENTIAL_EMPLOYEE)) {
             return ((LEARCredentialEmployee) credential).credentialSubject().mandate().mandator();
         }
         throw new InvalidCredentialFormatException("Unsupported credential type: " + types);
@@ -43,7 +46,7 @@ public final class Utils {
 
     public static LEARCredentialMachine.CredentialSubject.Mandate.Mandator extractMandatorLearCredentialMachine(LEARCredential credential) {
         List<String> types = credential.type();
-        if (types.contains("LEARCredentialMachine")) {
+        if (types.contains(LEAR_CREDENTIAL_MACHINE)) {
             return ((LEARCredentialMachine) credential).credentialSubject().mandate().mandator();
         }
         throw new InvalidCredentialFormatException("Unsupported credential type: " + types);
@@ -51,10 +54,10 @@ public final class Utils {
 
     public static String extractMandatorOrganizationIdentifier(LEARCredential credential) {
         List<String> types = credential.type();
-        if (types.contains("LEARCredentialEmployee")) {
+        if (types.contains(LEAR_CREDENTIAL_EMPLOYEE)) {
             Mandator m = ((LEARCredentialEmployee) credential).credentialSubject().mandate().mandator();
             return m != null ? m.organizationIdentifier() : null;
-            } else if (types.contains("LEARCredentialMachine")) {
+            } else if (types.contains(LEAR_CREDENTIAL_MACHINE)) {
             var m = ((LEARCredentialMachine) credential).credentialSubject().mandate().mandator();
             return m != null ? m.organizationIdentifier() : null;
             }
@@ -63,9 +66,9 @@ public final class Utils {
 
     public static List<Power> extractPowers(LEARCredential credential) {
         List<String> types = credential.type();
-        if (types.contains("LEARCredentialEmployee")) {
+        if (types.contains(LEAR_CREDENTIAL_EMPLOYEE)) {
             return ((LEARCredentialEmployee) credential).credentialSubject().mandate().power();
-        } else if (types.contains("LEARCredentialMachine")) {
+        } else if (types.contains(LEAR_CREDENTIAL_MACHINE)) {
             return ((LEARCredentialMachine) credential).credentialSubject().mandate().power();
         }
         throw new InvalidCredentialFormatException("Unsupported credential type: " + types);
