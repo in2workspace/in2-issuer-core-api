@@ -1072,5 +1072,283 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
                 .build();
     }
 
+    @Test
+    void authorize_machine_success_withMandatorIssuancePolicyValidLearCredentialMachine() throws Exception {
+        // Arrange
+        String token = "valid-token";
+        JsonNode payload = mock(JsonNode.class);
+
+        // Token credential: Employee with Onboarding/Execute + full Mandator fields
+        LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithFullMandatorData();
+
+        // Payload mandate: Machine mandate whose mandator matches token mandator
+        LEARCredentialMachine.CredentialSubject.Mandate payloadMandate =
+                LEARCredentialMachine.CredentialSubject.Mandate.builder()
+                        .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
+                                .organizationIdentifier(tokenCredential.credentialSubject().mandate().mandator().organizationIdentifier())
+                                .organization(tokenCredential.credentialSubject().mandate().mandator().organization())
+                                .country(tokenCredential.credentialSubject().mandate().mandator().country())
+                                .commonName(tokenCredential.credentialSubject().mandate().mandator().commonName())
+                                .serialNumber(tokenCredential.credentialSubject().mandate().mandator().serialNumber())
+                                .build())
+                        .power(Collections.singletonList(
+                                Power.builder()
+                                        .function("Onboarding")
+                                        .action("Execute")
+                                        .build()))
+                        .build();
+
+        when(objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class))
+                .thenReturn(payloadMandate);
+
+        SignedJWT signedJWT = mock(SignedJWT.class);
+        String vcClaim = "{\"type\": [\"VerifiableCredential\", \"LEARCredentialEmployee\"]}";
+
+        Map<String, Object> payloadMap = new HashMap<>();
+        payloadMap.put("iss", "internal-auth-server");
+        Payload jwtPayload = new Payload(payloadMap);
+
+        when(signedJWT.getPayload()).thenReturn(jwtPayload);
+        when(jwtService.parseJWT(token)).thenReturn(signedJWT);
+        when(jwtService.getClaimFromPayload(jwtPayload, VC)).thenReturn(vcClaim);
+
+        ObjectMapper realObjectMapper = new ObjectMapper();
+        JsonNode vcJsonNode = realObjectMapper.readTree(vcClaim);
+        when(objectMapper.readTree(vcClaim)).thenReturn(vcJsonNode);
+
+        when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim)).thenReturn(tokenCredential);
+
+        // Act
+        Mono<Void> result = policyAuthorizationService.authorize(token, LEAR_CREDENTIAL_MACHINE, payload, "dummy-id-token");
+
+        // Assert
+        StepVerifier.create(result).verifyComplete();
+    }
+
+    @Test
+    void authorize_machine_failure_whenPayloadMandatorOrganizationIsNull_equalsSafeReturnsFalse() throws Exception {
+        // Arrange
+        String token = "valid-token";
+        JsonNode payload = mock(JsonNode.class);
+
+        LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithFullMandatorData();
+
+        // Same as token, BUT payload mandator.organization is null => equalsSafe(null, tokenOrg) is false
+        LEARCredentialMachine.CredentialSubject.Mandate payloadMandate =
+                LEARCredentialMachine.CredentialSubject.Mandate.builder()
+                        .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
+                                .organizationIdentifier(tokenCredential.credentialSubject().mandate().mandator().organizationIdentifier())
+                                .organization(null)
+                                .country(tokenCredential.credentialSubject().mandate().mandator().country())
+                                .commonName(tokenCredential.credentialSubject().mandate().mandator().commonName())
+                                .serialNumber(tokenCredential.credentialSubject().mandate().mandator().serialNumber())
+                                .build())
+                        .power(Collections.singletonList(
+                                Power.builder()
+                                        .function("Onboarding")
+                                        .action("Execute")
+                                        .build()))
+                        .build();
+
+        when(objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class))
+                .thenReturn(payloadMandate);
+
+        SignedJWT signedJWT = mock(SignedJWT.class);
+        String vcClaim = "{\"type\": [\"VerifiableCredential\", \"LEARCredentialEmployee\"]}";
+
+        Map<String, Object> payloadMap = new HashMap<>();
+        payloadMap.put("iss", "internal-auth-server");
+        Payload jwtPayload = new Payload(payloadMap);
+
+        when(signedJWT.getPayload()).thenReturn(jwtPayload);
+        when(jwtService.parseJWT(token)).thenReturn(signedJWT);
+        when(jwtService.getClaimFromPayload(jwtPayload, VC)).thenReturn(vcClaim);
+
+        ObjectMapper realObjectMapper = new ObjectMapper();
+        JsonNode vcJsonNode = realObjectMapper.readTree(vcClaim);
+        when(objectMapper.readTree(vcClaim)).thenReturn(vcJsonNode);
+
+        when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim)).thenReturn(tokenCredential);
+
+        // Act
+        Mono<Void> result = policyAuthorizationService.authorize(token, LEAR_CREDENTIAL_MACHINE, payload, "dummy-id-token");
+
+        // Assert
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof InsufficientPermissionException &&
+                                throwable.getMessage().contains("Unauthorized"))
+                .verify();
+    }
+
+    @Test
+    void authorize_machine_failure_whenTokenMandatorIsNull() throws Exception {
+        // Arrange
+        String token = "valid-token";
+        JsonNode payload = mock(JsonNode.class);
+
+        LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithOnboardingExecuteButNullMandator();
+
+        // Payload mandate: can be valid, but it won't matter because tokenMandator becomes null
+        LEARCredentialMachine.CredentialSubject.Mandate payloadMandate =
+                LEARCredentialMachine.CredentialSubject.Mandate.builder()
+                        .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
+                                .organizationIdentifier("ANY")
+                                .organization("ANY")
+                                .country("ES")
+                                .commonName("ANY")
+                                .serialNumber("ANY")
+                                .build())
+                        .power(Collections.singletonList(
+                                Power.builder()
+                                        .function("Onboarding")
+                                        .action("Execute")
+                                        .build()))
+                        .build();
+
+        when(objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class))
+                .thenReturn(payloadMandate);
+
+        SignedJWT signedJWT = mock(SignedJWT.class);
+        String vcClaim = "{\"type\": [\"VerifiableCredential\", \"LEARCredentialEmployee\"]}";
+
+        Map<String, Object> payloadMap = new HashMap<>();
+        payloadMap.put("iss", "internal-auth-server");
+        Payload jwtPayload = new Payload(payloadMap);
+
+        when(signedJWT.getPayload()).thenReturn(jwtPayload);
+        when(jwtService.parseJWT(token)).thenReturn(signedJWT);
+        when(jwtService.getClaimFromPayload(jwtPayload, VC)).thenReturn(vcClaim);
+
+        ObjectMapper realObjectMapper = new ObjectMapper();
+        JsonNode vcJsonNode = realObjectMapper.readTree(vcClaim);
+        when(objectMapper.readTree(vcClaim)).thenReturn(vcJsonNode);
+
+        when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim)).thenReturn(tokenCredential);
+
+        // Act
+        Mono<Void> result = policyAuthorizationService.authorize(token, LEAR_CREDENTIAL_MACHINE, payload, "dummy-id-token");
+
+        // Assert
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof InsufficientPermissionException &&
+                                throwable.getMessage().contains("Unauthorized"))
+                .verify();
+    }
+
+    @Test
+    void authorize_machine_failure_whenPayloadMandateIsNull() throws Exception {
+        // Arrange
+        String token = "valid-token";
+        JsonNode payload = mock(JsonNode.class);
+
+        LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithFullMandatorData();
+
+        when(objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class))
+                .thenReturn(null);
+
+        SignedJWT signedJWT = mock(SignedJWT.class);
+        String vcClaim = "{\"type\": [\"VerifiableCredential\", \"LEARCredentialEmployee\"]}";
+
+        Map<String, Object> payloadMap = new HashMap<>();
+        payloadMap.put("iss", "internal-auth-server");
+        Payload jwtPayload = new Payload(payloadMap);
+
+        when(signedJWT.getPayload()).thenReturn(jwtPayload);
+        when(jwtService.parseJWT(token)).thenReturn(signedJWT);
+        when(jwtService.getClaimFromPayload(jwtPayload, VC)).thenReturn(vcClaim);
+
+        ObjectMapper realObjectMapper = new ObjectMapper();
+        JsonNode vcJsonNode = realObjectMapper.readTree(vcClaim);
+        when(objectMapper.readTree(vcClaim)).thenReturn(vcJsonNode);
+
+        when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim)).thenReturn(tokenCredential);
+
+        // Act
+        Mono<Void> result = policyAuthorizationService.authorize(token, LEAR_CREDENTIAL_MACHINE, payload, "dummy-id-token");
+
+        // Assert
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof InsufficientPermissionException &&
+                                throwable.getMessage().contains("Unauthorized"))
+                .verify();
+    }
+
+    private LEARCredentialEmployee getLEARCredentialEmployeeWithFullMandatorData() {
+        Mandator mandator = Mandator.builder()
+                .organizationIdentifier("ORG_ID_1")
+                .organization("ORG_1")
+                .country("ES")
+                .commonName("Org Common Name")
+                .serialNumber("SN-123")
+                .email("contact@example.com")
+                .build();
+
+        LEARCredentialEmployee.CredentialSubject.Mandate.Mandatee mandatee =
+                LEARCredentialEmployee.CredentialSubject.Mandate.Mandatee.builder()
+                        .id("did:key:1234")
+                        .firstName("John")
+                        .lastName("Doe")
+                        .email("john.doe@example.com")
+                        .build();
+
+        Power power = Power.builder()
+                .function("Onboarding")
+                .action("Execute")
+                .build();
+
+        LEARCredentialEmployee.CredentialSubject.Mandate mandate =
+                LEARCredentialEmployee.CredentialSubject.Mandate.builder()
+                        .mandator(mandator)
+                        .mandatee(mandatee)
+                        .power(Collections.singletonList(power))
+                        .build();
+
+        LEARCredentialEmployee.CredentialSubject credentialSubject =
+                LEARCredentialEmployee.CredentialSubject.builder()
+                        .mandate(mandate)
+                        .build();
+
+        return LEARCredentialEmployee.builder()
+                .type(List.of("VerifiableCredential", "LEARCredentialEmployee"))
+                .credentialSubject(credentialSubject)
+                .build();
+    }
+    private LEARCredentialEmployee getLEARCredentialEmployeeWithOnboardingExecuteButNullMandator() {
+        LEARCredentialEmployee.CredentialSubject.Mandate.Mandatee mandatee =
+                LEARCredentialEmployee.CredentialSubject.Mandate.Mandatee.builder()
+                        .id("did:key:1234")
+                        .firstName("John")
+                        .lastName("Doe")
+                        .email("john.doe@example.com")
+                        .build();
+
+        Power power = Power.builder()
+                .function("Onboarding")
+                .action("Execute")
+                .build();
+
+        // Mandator intentionally null
+        LEARCredentialEmployee.CredentialSubject.Mandate mandate =
+                LEARCredentialEmployee.CredentialSubject.Mandate.builder()
+                        .mandator(null)
+                        .mandatee(mandatee)
+                        .power(Collections.singletonList(power))
+                        .build();
+
+        LEARCredentialEmployee.CredentialSubject credentialSubject =
+                LEARCredentialEmployee.CredentialSubject.builder()
+                        .mandate(mandate)
+                        .build();
+
+        return LEARCredentialEmployee.builder()
+                .type(List.of("VerifiableCredential", "LEARCredentialEmployee"))
+                .credentialSubject(credentialSubject)
+                .build();
+    }
+
+
 
 }
