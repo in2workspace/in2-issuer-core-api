@@ -57,10 +57,10 @@ public final class Utils {
         if (types.contains(LEAR_CREDENTIAL_EMPLOYEE)) {
             Mandator m = ((LEARCredentialEmployee) credential).credentialSubject().mandate().mandator();
             return m != null ? m.organizationIdentifier() : null;
-            } else if (types.contains(LEAR_CREDENTIAL_MACHINE)) {
-            var m = ((LEARCredentialMachine) credential).credentialSubject().mandate().mandator();
-            return m != null ? m.organizationIdentifier() : null;
-            }
+        } else if (types.contains(LEAR_CREDENTIAL_MACHINE)) {
+        var m = ((LEARCredentialMachine) credential).credentialSubject().mandate().mandator();
+        return m != null ? m.organizationIdentifier() : null;
+        }
         throw new InvalidCredentialFormatException("Unsupported credential type: " + types);
     }
 

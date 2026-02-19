@@ -721,7 +721,7 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
                 .organizationIdentifier("OTHER_ORGANIZATION")
                 .commonName("SomeOtherOrganization")
                 .country("ES")
-                .email("someaddres@example.com")
+                .email("someaddress@example.com")
                 .serialNumber("123456")
                 .build();
         LEARCredentialEmployee.CredentialSubject.Mandate.Mandatee mandatee =
@@ -1036,7 +1036,7 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
                 .organizationIdentifier("OTHER_ORGANIZATION")
                 .commonName("SomeOtherOrganization")
                 .country("ES")
-                .email("someaddres@example.com")
+                .email("someaddress@example.com")
                 .serialNumber("123456")
                 .build();
 
