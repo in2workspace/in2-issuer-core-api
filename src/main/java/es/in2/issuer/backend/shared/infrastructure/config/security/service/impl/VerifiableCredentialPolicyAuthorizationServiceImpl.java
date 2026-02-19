@@ -174,10 +174,6 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
 
     // It checks if the signer if Mandator is IN2 or if the credential has same organizationIdentifier as the Mandator of the credential.
     private Mono<Void> authorizeLearCredentialEmployee(LEARCredential learCredential, JsonNode payload) {
-       log.info("authorizeLearCredentialEmployee");
-       log.info("learCredential from token: {}", learCredential);
-       log.info("payload from credential to be issued: {}", payload);
-
         if (isSignerIssuancePolicyValid(learCredential) || isMandatorIssuancePolicyValid(learCredential, payload)) {
             return Mono.empty();
         }
