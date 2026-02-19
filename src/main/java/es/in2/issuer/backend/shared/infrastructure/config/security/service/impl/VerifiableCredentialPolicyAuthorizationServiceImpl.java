@@ -259,11 +259,12 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
             return false;
         }
 
-        LEARCredentialMachine.CredentialSubject.Mandate.Mandator tokenMandator =
-                extractMandatorLearCredentialMachine(learCredential);
+        Mandator tokenMandator = extractMandatorLearCredentialEmployee(learCredential);
+        if (tokenMandator == null) {
+            return false;
+        }
 
-        LEARCredentialMachine.CredentialSubject.Mandate.Mandator payloadMandator =
-                mandate.mandator();
+        LEARCredentialMachine.CredentialSubject.Mandate.Mandator payloadMandator = mandate.mandator();
 
         return equalsSafe(payloadMandator.organizationIdentifier(), tokenMandator.organizationIdentifier())
                 && equalsSafe(payloadMandator.organization(), tokenMandator.organization())
