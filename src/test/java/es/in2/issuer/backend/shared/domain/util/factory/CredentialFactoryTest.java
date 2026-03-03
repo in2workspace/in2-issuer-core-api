@@ -290,7 +290,6 @@ class CredentialFactoryTest {
     void testBindCryptographicCredentialSubjectId_Machine_ErrorPropagates() {
         // Arrange
         String processId = "processId";
-        String credentialType = LEAR_CREDENTIAL_MACHINE;
         String decodedCredential = "decodedCredential";
         String subjectDid = "did:key:zDna...";
         RuntimeException error = new RuntimeException("bind error");
@@ -302,7 +301,7 @@ class CredentialFactoryTest {
         StepVerifier.create(
                         credentialFactory.bindCryptographicCredentialSubjectId(
                                 processId,
-                                credentialType,
+                                LEAR_CREDENTIAL_MACHINE,
                                 decodedCredential,
                                 subjectDid
                         )
