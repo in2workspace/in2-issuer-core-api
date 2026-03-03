@@ -36,7 +36,26 @@ public class LEARCredentialMachineFactory {
 
     public Mono<String> bindCryptographicCredentialSubjectId(String decodedCredentialString) {
         LEARCredentialMachine decodedCredential = mapStringToLEARCredentialMachine(decodedCredentialString);
-        String mandateeId = decodedCredential.credentialSubject().mandate().mandatee().id();
+
+        LEARCredentialMachine.CredentialSubject credentialSubject = decodedCredential.credentialSubject();
+        if (credentialSubject == null) {
+            throw new InvalidCredentialFormatException("Missing credentialSubject in LEARCredentialMachine");
+        }
+
+        LEARCredentialMachine.CredentialSubject.Mandate mandate = credentialSubject.mandate();
+        if (mandate == null) {
+            throw new InvalidCredentialFormatException("Missing mandate in LEARCredentialMachine.credentialSubject");
+        }
+
+        LEARCredentialMachine.CredentialSubject.Mandate.Mandatee mandatee = mandate.mandatee();
+        if (mandatee == null) {
+            throw new InvalidCredentialFormatException("Missing mandatee in LEARCredentialMachine.credentialSubject.mandate");
+        }
+
+        String mandateeId = mandatee.id();
+        if (mandateeId == null || mandateeId.isBlank()) {
+            throw new InvalidCredentialFormatException("Missing or blank mandatee.id in LEARCredentialMachine.credentialSubject.mandate.mandatee");
+        }
         return bindSubjectIdToLearCredentialMachine(decodedCredential, mandateeId)
                 .flatMap(this::convertLEARCredentialMachineInToString);
     }
