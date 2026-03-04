@@ -11,8 +11,6 @@ import es.in2.issuer.backend.shared.domain.model.dto.credential.CredentialStatus
 import es.in2.issuer.backend.shared.domain.model.dto.credential.DetailedIssuer;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.machine.LEARCredentialMachine;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialType;
-import es.in2.issuer.backend.shared.domain.service.AccessTokenService;
-import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,13 +32,31 @@ import static es.in2.issuer.backend.shared.domain.util.Constants.*;
 public class LEARCredentialMachineFactory {
 
     private final ObjectMapper objectMapper;
-    private final AccessTokenService accessTokenService;
     private final IssuerFactory issuerFactory;
-    private final AppConfig appConfig;
 
-    public Mono<String> bindCryptographicCredentialSubjectId(String decodedCredentialString, String subjectId) {
+    public Mono<String> bindCryptographicCredentialSubjectId(String decodedCredentialString) {
         LEARCredentialMachine decodedCredential = mapStringToLEARCredentialMachine(decodedCredentialString);
-        return bindSubjectIdToLearCredentialMachine(decodedCredential, subjectId)
+
+        LEARCredentialMachine.CredentialSubject credentialSubject = decodedCredential.credentialSubject();
+        if (credentialSubject == null) {
+            throw new InvalidCredentialFormatException("Missing credentialSubject in LEARCredentialMachine");
+        }
+
+        LEARCredentialMachine.CredentialSubject.Mandate mandate = credentialSubject.mandate();
+        if (mandate == null) {
+            throw new InvalidCredentialFormatException("Missing mandate in LEARCredentialMachine.credentialSubject");
+        }
+
+        LEARCredentialMachine.CredentialSubject.Mandate.Mandatee mandatee = mandate.mandatee();
+        if (mandatee == null) {
+            throw new InvalidCredentialFormatException("Missing mandatee in LEARCredentialMachine.credentialSubject.mandate");
+        }
+
+        String mandateeId = mandatee.id();
+        if (mandateeId == null || mandateeId.isBlank()) {
+            throw new InvalidCredentialFormatException("Missing or blank mandatee.id in LEARCredentialMachine.credentialSubject.mandate.mandatee");
+        }
+        return bindSubjectIdToLearCredentialMachine(decodedCredential, mandateeId)
                 .flatMap(this::convertLEARCredentialMachineInToString);
     }
 
@@ -154,9 +170,7 @@ public class LEARCredentialMachineFactory {
     }
 
     public Mono<LEARCredentialMachineJwtPayload> buildLEARCredentialMachineJwtPayload(LEARCredentialMachine learCredentialMachine) {
-        String subject = learCredentialMachine.credentialSubject().id() != null
-                ? learCredentialMachine.credentialSubject().id()
-                : learCredentialMachine.credentialSubject().mandate().mandatee().id();
+        String subject = learCredentialMachine.credentialSubject().mandate().mandatee().id();
 
         return Mono.just(
                 LEARCredentialMachineJwtPayload.builder()

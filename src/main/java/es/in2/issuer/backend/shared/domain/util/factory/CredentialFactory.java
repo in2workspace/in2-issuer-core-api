@@ -55,7 +55,7 @@ public class CredentialFactory {
                             log.info("ProcessID: {} - LEARCredentialEmployee mapped and bind to the id: {}", processId, bound));
         } else if (credentialType.equals(LEAR_CREDENTIAL_MACHINE)) {
             return learCredentialMachineFactory
-                    .bindCryptographicCredentialSubjectId(decodedCredential, subjectDid)
+                    .bindCryptographicCredentialSubjectId(decodedCredential)
                     .doOnSuccess(bound ->
                             log.info("ProcessID: {} - LEARCredentialMachine mapped and bind to the id: {}", processId, bound));
         }

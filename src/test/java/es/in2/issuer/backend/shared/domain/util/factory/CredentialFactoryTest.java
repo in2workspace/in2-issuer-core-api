@@ -267,7 +267,7 @@ class CredentialFactoryTest {
         String subjectDid = "did:key:zDna...";
         String expected = "boundCredential";
 
-        when(learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decodedCredential, subjectDid))
+        when(learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decodedCredential))
                 .thenReturn(Mono.just(expected));
 
         // Act & Assert
@@ -282,7 +282,7 @@ class CredentialFactoryTest {
                 .expectNext(expected)
                 .verifyComplete();
 
-        verify(learCredentialMachineFactory).bindCryptographicCredentialSubjectId(decodedCredential, subjectDid);
+        verify(learCredentialMachineFactory).bindCryptographicCredentialSubjectId(decodedCredential);
         verifyNoInteractions(learCredentialEmployeeFactory);
     }
 
@@ -290,19 +290,18 @@ class CredentialFactoryTest {
     void testBindCryptographicCredentialSubjectId_Machine_ErrorPropagates() {
         // Arrange
         String processId = "processId";
-        String credentialType = LEAR_CREDENTIAL_MACHINE;
         String decodedCredential = "decodedCredential";
         String subjectDid = "did:key:zDna...";
         RuntimeException error = new RuntimeException("bind error");
 
-        when(learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decodedCredential, subjectDid))
+        when(learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decodedCredential))
                 .thenReturn(Mono.error(error));
 
         // Act & Assert
         StepVerifier.create(
                         credentialFactory.bindCryptographicCredentialSubjectId(
                                 processId,
-                                credentialType,
+                                LEAR_CREDENTIAL_MACHINE,
                                 decodedCredential,
                                 subjectDid
                         )
@@ -310,7 +309,7 @@ class CredentialFactoryTest {
                 .expectErrorMatches(t -> t == error)
                 .verify();
 
-        verify(learCredentialMachineFactory).bindCryptographicCredentialSubjectId(decodedCredential, subjectDid);
+        verify(learCredentialMachineFactory).bindCryptographicCredentialSubjectId(decodedCredential);
         verifyNoInteractions(learCredentialEmployeeFactory);
     }
 
