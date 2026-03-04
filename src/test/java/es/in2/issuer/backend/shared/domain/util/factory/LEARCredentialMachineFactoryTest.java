@@ -22,6 +22,7 @@ import reactor.test.StepVerifier;
 import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -102,7 +103,8 @@ class LEARCredentialMachineFactoryTest {
     void convertLEARCredentialMachineInToString_whenWriteFails_emitsCredentialSerializationException() throws Exception {
         LEARCredentialMachine credential = mock(LEARCredentialMachine.class);
         when(objectMapper.writeValueAsString(any(LEARCredentialMachine.class)))
-                .thenThrow(new JsonProcessingException("error") {});
+                .thenThrow(new JsonProcessingException("error") {
+                });
 
         Method m = LEARCredentialMachineFactory.class
                 .getDeclaredMethod("convertLEARCredentialMachineInToString", LEARCredentialMachine.class);
@@ -124,7 +126,8 @@ class LEARCredentialMachineFactoryTest {
     void convertLEARCredentialMachineJwtPayloadInToString_whenWriteFails_emitsCredentialSerializationException() throws Exception {
         LEARCredentialMachineJwtPayload payload = mock(LEARCredentialMachineJwtPayload.class);
         when(objectMapper.writeValueAsString(any(LEARCredentialMachineJwtPayload.class)))
-                .thenThrow(new JsonProcessingException("error"){});
+                .thenThrow(new JsonProcessingException("error") {
+                });
 
         Mono<String> result = learCredentialMachineFactory.convertLEARCredentialMachineJwtPayloadInToString(payload);
 
@@ -209,6 +212,7 @@ class LEARCredentialMachineFactoryTest {
                 })
                 .verifyComplete();
     }
+
     @Test
     void bindCryptographicCredentialSubjectId_shouldBindSubjectIdAndSerialize() throws Exception {
         // Arrange
@@ -289,7 +293,8 @@ class LEARCredentialMachineFactoryTest {
         when(objectMapper.readValue(decoded, LEARCredentialMachine.class)).thenReturn(decodedMachine);
 
         when(objectMapper.writeValueAsString(any(LEARCredentialMachine.class)))
-                .thenThrow(new JsonProcessingException("write boom") {});
+                .thenThrow(new JsonProcessingException("write boom") {
+                });
 
         // Act
         Mono<String> result = learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decoded);
@@ -310,7 +315,8 @@ class LEARCredentialMachineFactoryTest {
 
 
         when(objectMapper.readValue(decoded, LEARCredentialMachine.class))
-                .thenThrow(new JsonProcessingException("boom") {});
+                .thenThrow(new JsonProcessingException("boom") {
+                });
 
         org.junit.jupiter.api.Assertions.assertThrows(
                 InvalidCredentialFormatException.class,
@@ -318,6 +324,51 @@ class LEARCredentialMachineFactoryTest {
         );
 
         verify(objectMapper).readValue(decoded, LEARCredentialMachine.class);
+        verify(objectMapper, never()).writeValueAsString(any());
+    }
+
+    @Test
+    void bindCryptographicCredentialSubjectId_whenCredentialSubjectIsNull_throwsInvalidCredentialFormatException() throws Exception {
+        // Arrange
+        String decoded = "{\"any\":\"json\"}";
+
+        LEARCredentialMachine decodedMachine = LEARCredentialMachine.builder()
+                .credentialSubject(null)
+                .build();
+
+        when(objectMapper.readValue(decoded, LEARCredentialMachine.class))
+                .thenReturn(decodedMachine);
+
+        // Act & Assert
+        assertThatExceptionOfType(InvalidCredentialFormatException.class)
+                .isThrownBy(() -> learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decoded));
+
+        verify(objectMapper, times(2)).readValue(decoded, LEARCredentialMachine.class);
+        verify(objectMapper, never()).writeValueAsString(any());
+    }
+
+    @Test
+    void bindCryptographicCredentialSubjectId_whenMandateIsNull_throwsInvalidCredentialFormatException() throws Exception {
+        // Arrange
+        String decoded = "{\"any\":\"json\"}";
+
+        LEARCredentialMachine.CredentialSubject subject =
+                LEARCredentialMachine.CredentialSubject.builder()
+                        .mandate(null)
+                        .build();
+
+        LEARCredentialMachine decodedMachine = LEARCredentialMachine.builder()
+                .credentialSubject(subject)
+                .build();
+
+        when(objectMapper.readValue(decoded, LEARCredentialMachine.class))
+                .thenReturn(decodedMachine);
+
+        // Act & Assert
+        assertThatExceptionOfType(InvalidCredentialFormatException.class)
+                .isThrownBy(() -> learCredentialMachineFactory.bindCryptographicCredentialSubjectId(decoded));
+
+        verify(objectMapper, times(2)).readValue(decoded, LEARCredentialMachine.class);
         verify(objectMapper, never()).writeValueAsString(any());
     }
 
