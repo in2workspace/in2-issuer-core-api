@@ -716,6 +716,31 @@ class GlobalExceptionHandlerTest {
         verify(errors).handleWith(ex, request, type, title, st, fallback);
     }
 
+    @Test
+    void handleInvalidCredentialFormatException() {
+        var ex = new InvalidCredentialFormatException("invalid credential payload");
+        var type = GlobalErrorTypes.INVALID_CREDENTIAL_FORMAT.getCode();
+        var title = "Invalid credential format";
+        var st = HttpStatus.BAD_REQUEST;
+        var fallback = "The credential payload is invalid";
+
+        var expected = new GlobalErrorMessage(
+                type,
+                title,
+                st.value(),
+                "invalid credential payload",
+                UUID.randomUUID().toString()
+        );
+
+        when(errors.handleWith(ex, request, type, title, st, fallback))
+                .thenReturn(Mono.just(expected));
+
+        StepVerifier.create(handler.handleInvalidCredentialFormatException(ex, request))
+                .assertNext(gem -> assertGem(gem, type, title, st, "invalid credential payload"))
+                .verifyComplete();
+
+        verify(errors).handleWith(ex, request, type, title, st, fallback);
+    }
 
 
 }
