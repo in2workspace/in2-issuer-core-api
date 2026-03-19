@@ -29,12 +29,7 @@ public class PublicCORSConfig {
 
         // Open config for public endpoints
         CorsConfiguration openConfig = new CorsConfiguration();
-        // todo remove localhost
-        openConfig.setAllowedOriginPatterns(List.of(
-                "https://*",
-                "http://localhost:*",
-                "http://127.0.0.1:*"
-        ));
+        openConfig.setAllowedOriginPatterns(List.of("https://*"));
         openConfig.setAllowedMethods(List.of("GET", "POST", OPTIONS));
         openConfig.setAllowedHeaders(List.of("*"));
         openConfig.setAllowCredentials(false);
