@@ -37,8 +37,13 @@ public class PublicCORSConfig {
 
         source.registerCorsConfiguration(CREDENTIAL_ISSUER_METADATA_WELL_KNOWN_PATH, openConfig);
         source.registerCorsConfiguration(AUTHORIZATION_SERVER_METADATA_WELL_KNOWN_PATH, openConfig);
-        source.registerCorsConfiguration(CORS_CREDENTIAL_OFFER_PATH, openConfig);
         source.registerCorsConfiguration(OAUTH_TOKEN_PATH, openConfig);
+
+        source.registerCorsConfiguration(CORS_CREDENTIAL_OFFER_PATH, openConfig);
+        source.registerCorsConfiguration(OID4VCI_CREDENTIAL_OFFER_PATH, openConfig);
+        source.registerCorsConfiguration(OID4VCI_CREDENTIAL_PATH, openConfig);
+        source.registerCorsConfiguration(OID4VCI_DEFERRED_CREDENTIAL_PATH, openConfig);
+        source.registerCorsConfiguration(OID4VCI_NOTIFICATION_PATH, openConfig);
 
         // Restricted config
         CorsConfiguration externalConfig = new CorsConfiguration();
@@ -49,15 +54,6 @@ public class PublicCORSConfig {
         externalConfig.setMaxAge(1800L);
 
         source.registerCorsConfiguration(VCI_ISSUANCES_PATH, externalConfig);
-
-        CorsConfiguration oid4vciConfig = new CorsConfiguration();
-        oid4vciConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", OPTIONS));
-        oid4vciConfig.setAllowedHeaders(List.of("*"));
-        oid4vciConfig.setAllowCredentials(false);
-        oid4vciConfig.setMaxAge(1800L);
-
-        source.registerCorsConfiguration(OID4VCI_CREDENTIAL_OFFER_PATH, oid4vciConfig);
-        source.registerCorsConfiguration(OID4VCI_CREDENTIAL_PATH, oid4vciConfig);
 
         return source;
     }
