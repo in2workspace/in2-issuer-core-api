@@ -45,7 +45,7 @@ logging:
     level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
   level:
     # Sets logging level for the custom package "org.springframework.security" (OPTIONAL)
-    org.springframework.security: INFO
+    org.springframework.security: TRACE
     # Sets logging level for the custom package "es.in2.issuer" (OPTIONAL)
     es.in2.issuer: INFO
     # Para ver en detalle el DispatcherServlet
