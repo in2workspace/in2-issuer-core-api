@@ -27,9 +27,6 @@ import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFa
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialMachineFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LabelCredentialFactory;
 import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedureRepository;
-import es.in2.issuer.backend.shared.domain.service.ProcedureRetryService;
-import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.minvws.encoding.Base45;
@@ -68,7 +65,6 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
     private final CredentialDeliveryService credentialDeliveryService;
     private final DeferredCredentialMetadataService deferredCredentialMetadataService;
     private final IssuerFactory issuerFactory;
-    private final ProcedureRetryService procedureRetryService;
 
 
     @Override
@@ -355,13 +351,16 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                                             log.debug("Using credentialId for delivery: {}", credentialId)
                                                                                     )
                                                                                     .flatMap(credentialId ->
-                                                                                            deliverLabelCredentialWithRetry(
-                                                                                                    responseUri,
-                                                                                                    signedVc,
-                                                                                                    credentialId,
-                                                                                                    companyEmail,
-                                                                                                    UUID.fromString(procedureId)
-                                                                                            )
+                                                                                            m2mTokenService.getM2MToken()
+                                                                                                    .flatMap(m2mToken ->
+                                                                                                            credentialDeliveryService.sendVcToResponseUri(
+                                                                                                                    responseUri,
+                                                                                                                    signedVc,
+                                                                                                                    credentialId,
+                                                                                                                    companyEmail,
+                                                                                                                    m2mToken.accessToken()
+                                                                                                            )
+                                                                                                    )
                                                                                     );
                                                                         } catch (Exception e) {
                                                                             log.error("Error preparing signed VC for delivery", e);
@@ -384,42 +383,5 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                 bindCredential,
                 JWT_VC
         );
-    }
-
-    /**
-     * Delivers label credential to response URI with retry mechanism.
-     * If initial retries fail, creates a retry record for scheduler-based recovery.
-     */
-    private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
-                                                       String credentialId, String companyEmail, 
-                                                       UUID procedureId) {
-        log.info("Attempting to deliver label credential to response URI: {}", responseUri);
-
-        LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(responseUri)
-                .signedCredential(signedVc)
-                .credentialId(credentialId)
-                .companyEmail(companyEmail)
-                .build();
-
-        return procedureRetryService.executeUploadLabelToResponseUri(payload)
-                .doOnSuccess(unused -> log.info("Successfully delivered label credential to response URI"))
-                .onErrorResume(e -> {
-                    log.error("Initial delivery failed for procedure {}, creating retry record: {}", 
-                             procedureId, e.getMessage(), e);
-                    
-                    // Create retry record for scheduler-based recovery
-                    return procedureRetryService.createRetryRecord(
-                            procedureId, 
-                            ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, 
-                            payload
-                    )
-                    .doOnSuccess(unused -> log.info("Created retry record for procedure {}", procedureId))
-                    .onErrorResume(retryError -> {
-                        log.error("Failed to create retry record for procedure {}: {}", 
-                                 procedureId, retryError.getMessage(), retryError);
-                        return Mono.empty(); // Don't fail the main flow
-                    });
-                });
     }
 }
