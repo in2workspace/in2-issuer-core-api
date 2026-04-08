@@ -58,7 +58,11 @@ public class CredentialDeliveryServiceImpl implements CredentialDeliveryService 
                 .onErrorResume(WebClientRequestException.class, ex -> {
                     log.error("Network error while sending VC to response_uri", ex);
                     return emailService.sendResponseUriFailed(email, credId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
-                            .then();
+                            .onErrorResume(emailError -> {
+                                log.error("Failed to send failure email after network error", emailError);
+                                return Mono.empty();
+                            })
+                            .then(Mono.error(ex));
                 });
     }
 }
