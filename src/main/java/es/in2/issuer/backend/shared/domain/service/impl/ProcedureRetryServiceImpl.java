@@ -38,11 +38,14 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // Retry configuration constants - can be overridden via method parameters
     private static final int INITIAL_RETRY_ATTEMPTS = 3;
     private static final Duration[] INITIAL_RETRY_DELAYS = {
-            Duration.ofMinutes(1),
-            Duration.ofMinutes(5), 
-            Duration.ofMinutes(15)
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(10),
+            Duration.ofSeconds(15)
+//          todo restore  Duration.ofMinutes(1),
+//            Duration.ofMinutes(5),
+//            Duration.ofMinutes(15)
     };
-    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
+    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofMinutes(2);
 
     @Override
     public Mono<Void> createRetryRecord(UUID procedureId, ActionType actionType, Object payload) {
