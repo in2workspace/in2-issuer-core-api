@@ -49,10 +49,11 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     @Override
     public Mono<Void> createRetryRecord(UUID procedureId, ActionType actionType, Object payload) {
+        log.info("[RETRY-TEST] [createRetryRecord] Called for procedureId={} actionType={}", procedureId, actionType);
         return Mono.fromCallable(() -> {
             try {
                 String payloadJson = objectMapper.writeValueAsString(payload);
-                
+                log.info("[RETRY-TEST] [createRetryRecord] Creating ProcedureRetry entity for procedureId={} actionType={}", procedureId, actionType);
                 ProcedureRetry retryRecord = ProcedureRetry.builder()
                         .id(UUID.randomUUID())
                         .procedureId(procedureId)
@@ -64,20 +65,19 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
                         .build();
-                
                 return retryRecord;
             } catch (Exception e) {
-                log.error("Error creating retry record payload for procedure {}: {}", procedureId, e.getMessage(), e);
+                log.error("[RETRY-TEST] [createRetryRecord] ERROR serializing payload for procedureId={}: {}", procedureId, e.getMessage(), e);
                 throw new RuntimeException("Failed to serialize retry payload", e);
             }
         })
         .subscribeOn(Schedulers.boundedElastic())
         .flatMap(procedureRetryRepository::upsert)
-        .doOnSuccess(rowsAffected -> log.info("Upserted retry record for procedure {} with action {} (rows affected: {})", 
+        .doOnSuccess(rowsAffected -> log.info("[RETRY-TEST] [createRetryRecord] Upserted retry record for procedureId={} actionType={} (rows affected: {})", 
                 procedureId, actionType, rowsAffected))
         .flatMap(unused -> sendFirstFailureNotification(procedureId, actionType))
         .onErrorResume(e -> {
-            log.error("Failed to upsert retry record for procedure {}: {}", procedureId, e.getMessage(), e);
+            log.error("[RETRY-TEST] [createRetryRecord] ERROR upserting retry record for procedureId={}: {}", procedureId, e.getMessage(), e);
             return Mono.empty(); // Don't fail the main flow, just log the error
         });
     }
@@ -125,14 +125,17 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     @Override
     public Mono<Void> markRetryAsCompleted(UUID procedureId, ActionType actionType) {
         return procedureRetryRepository.markAsCompleted(procedureId, actionType)
-                .doOnSuccess(rowsAffected -> {
-                    if (rowsAffected > 0) {
-                        log.info("Marked retry as completed for procedure {} with action {}", procedureId, actionType);
-                    } else {
-                        log.warn("No retry record found to mark as completed for procedure {} with action {}", procedureId, actionType);
+                .flatMap(rowsAffected -> {
+                    if (rowsAffected == null || rowsAffected == 0) {
+                        log.warn("No retry record found to mark as completed for procedure {} with action {}",
+                                procedureId, actionType);
+                        return Mono.error(new IllegalArgumentException(
+                                "No retry record found for procedure " + procedureId + " and action " + actionType));
                     }
+
+                    log.info("Marked retry as completed for procedure {} with action {}", procedureId, actionType);
+                    return sendSuccessNotification(procedureId, actionType);
                 })
-                .flatMap(unused -> sendSuccessNotification(procedureId, actionType))
                 .then();
     }
 
@@ -219,19 +222,46 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     private Retry createInitialRetrySpec(String operationName, int attempts, Duration[] delays) {
-        return Retry.backoff(attempts, delays[0])
-                .maxBackoff(delays.length > 2 ? delays[2] : delays[delays.length - 1])
-                .jitter(0.2)
-                .filter(this::isRecoverableError)
-                .doBeforeRetry(retrySignal -> {
+        if (attempts < 1) {
+            throw new IllegalArgumentException("attempts must be greater than 0");
+        }
+        if (delays == null || delays.length == 0) {
+            throw new IllegalArgumentException("delays must contain at least one value");
+        }
+
+        for (Duration delay : delays) {
+            if (delay == null || delay.isNegative()) {
+                throw new IllegalArgumentException("delays must not contain null or negative values");
+            }
+        }
+
+        return Retry.from(companion ->
+                companion.concatMap(retrySignal -> {
                     long attempt = retrySignal.totalRetries() + 1;
-                    Duration nextDelay = attempt <= delays.length ? 
-                            delays[(int)attempt - 1] : delays[delays.length - 1];
-                    
-                    log.warn("Retrying {} attempt {} of {}, next delay: {}, reason: {}", 
-                            operationName, attempt, attempts, nextDelay, 
-                            retrySignal.failure() != null ? retrySignal.failure().getMessage() : "n/a");
-                });
+                    Throwable failure = retrySignal.failure();
+
+                    if (failure == null) {
+                        return Mono.error(new IllegalStateException("Retry failure is null"));
+                    }
+
+                    if (!isRecoverableError(failure)) {
+                        return Mono.error(failure);
+                    }
+
+                    if (attempt > attempts) {
+                        return Mono.error(failure);
+                    }
+
+                    Duration nextDelay = attempt <= delays.length
+                            ? delays[(int) attempt - 1]
+                            : delays[delays.length - 1];
+
+                    log.warn("Retrying {} attempt {} of {}, next delay: {}, reason: {}",
+                            operationName, attempt, attempts, nextDelay, failure.getMessage());
+
+                    return Mono.delay(nextDelay);
+                })
+        );
     }
 
     private boolean isRecoverableError(Throwable throwable) {

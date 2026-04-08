@@ -393,33 +393,35 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
     private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
                                                        String credentialId, String companyEmail, 
                                                        UUID procedureId) {
-        log.info("Attempting to deliver label credential to response URI: {}", responseUri);
+        log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
+            procedureId, responseUri, credentialId, companyEmail);
 
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(responseUri)
-                .signedCredential(signedVc)
-                .credentialId(credentialId)
-                .companyEmail(companyEmail)
-                .build();
+            .responseUri(responseUri)
+            .signedCredential(signedVc)
+            .credentialId(credentialId)
+            .companyEmail(companyEmail)
+            .build();
 
+        log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Invoking executeUploadLabelToResponseUri for procedureId={}", procedureId);
         return procedureRetryService.executeUploadLabelToResponseUri(payload)
-                .doOnSuccess(unused -> log.info("Successfully delivered label credential to response URI"))
-                .onErrorResume(e -> {
-                    log.error("Initial delivery failed for procedure {}, creating retry record: {}", 
-                             procedureId, e.getMessage(), e);
-                    
-                    // Create retry record for scheduler-based recovery
-                    return procedureRetryService.createRetryRecord(
-                            procedureId, 
-                            ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, 
-                            payload
-                    )
-                    .doOnSuccess(unused -> log.info("Created retry record for procedure {}", procedureId))
-                    .onErrorResume(retryError -> {
-                        log.error("Failed to create retry record for procedure {}: {}", 
-                                 procedureId, retryError.getMessage(), retryError);
-                        return Mono.empty(); // Don't fail the main flow
-                    });
+            .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] SUCCESS: Label credential delivered to response URI for procedureId={}", procedureId))
+            .doOnError(e -> log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Delivery failed for procedureId={} - {}", procedureId, e.getMessage(), e))
+            .onErrorResume(e -> {
+                log.warn("[RETRY-TEST] [deliverLabelCredentialWithRetry] Initial delivery failed for procedureId={}, creating retry record. Reason: {}", 
+                     procedureId, e.getMessage(), e);
+                // Create retry record for scheduler-based recovery
+                return procedureRetryService.createRetryRecord(
+                    procedureId, 
+                    ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, 
+                    payload
+                )
+                .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Created retry record for procedureId={}", procedureId))
+                .onErrorResume(retryError -> {
+                log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Failed to create retry record for procedureId={} - {}", 
+                     procedureId, retryError.getMessage(), retryError);
+                return Mono.empty(); // Don't fail the main flow
                 });
+            });
     }
 }

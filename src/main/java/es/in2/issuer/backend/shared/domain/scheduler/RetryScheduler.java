@@ -21,12 +21,11 @@ public class RetryScheduler {
     @Scheduled(fixedRate = 5 * 1000) // todo remove
 //    @Scheduled(fixedRate = 12 * 60 * 60 * 1000) // Every 12 hours (in milliseconds)
     public Mono<Void> processRetries() {
-        log.info("Scheduled Task - Executing retry processing at: {}", Instant.now());
-        
+        log.info("[RETRY-TEST] [RetryScheduler] Scheduled Task - Executing retry processing at: {}", Instant.now());
         return procedureRetryService.processPendingRetries()
-                .then(procedureRetryService.markRetryAsExhausted())
-                .doOnSuccess(unused -> log.info("Completed scheduled retry processing"))
-                .doOnError(e -> log.error("Error during scheduled retry processing: {}", e.getMessage(), e))
-                .onErrorResume(e -> Mono.empty()); // Don't let the scheduler stop on errors
+            .then(procedureRetryService.markRetryAsExhausted())
+            .doOnSuccess(unused -> log.info("[RETRY-TEST] [RetryScheduler] Completed scheduled retry processing at {}", Instant.now()))
+            .doOnError(e -> log.error("[RETRY-TEST] [RetryScheduler] ERROR during scheduled retry processing: {}", e.getMessage(), e))
+            .onErrorResume(e -> Mono.empty()); // Don't let the scheduler stop on errors
     }
 }
