@@ -126,6 +126,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     private Mono<ResponseUriDeliveryResult> deliverLabelWithImmediateRetries(LabelCredentialDeliveryPayload payload) {
+        log.info("[DELIVERY] Attempting to deliver label for credId: {} with immediate retries", payload.credentialId());
         return m2mTokenService.getM2MToken()
                 .flatMap(m2mToken ->
                         credentialDeliveryService.deliverLabelToResponseUri(
@@ -279,6 +280,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     private Mono<Void> updateRetryAfterScheduledFailure(ProcedureRetry retryRecord) {
+        log.info("updateRetryAfterScheduledFailure: {}", retryRecord);
         return procedureRetryRepository.incrementAttemptCount(
                         retryRecord.getProcedureId(),
                         retryRecord.getActionType(),
@@ -363,8 +365,10 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     private Mono<LabelCredentialDeliveryPayload> deserializePayload(ProcedureRetry retryRecord) {
+        log.info("deserializePayload: {}", retryRecord);
         return Mono.fromCallable(() -> {
                     try {
+                        log.info("return deserializePayload: {}", retryRecord);
                         return objectMapper.readValue(retryRecord.getPayload(), LabelCredentialDeliveryPayload.class);
                     } catch (Exception e) {
                         log.error("[RETRY] Error deserializing retry payload for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage(), e);
