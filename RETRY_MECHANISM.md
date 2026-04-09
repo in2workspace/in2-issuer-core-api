@@ -7,23 +7,27 @@ This implementation provides a comprehensive retry mechanism for external action
 ## Key Features
 
 ### 1. Initial Execution with Short Retries
-- Uses Reactor's `Retry.backoff()` with configurable delays (default: 1min, 5min, 15min)
-- Retries only on recoverable errors (5xx responses, connection issues, timeouts)
+- Uses Reactor's `Retry` with configurable delays (default: 5s, 10s, 15s)
+- Retries only on recoverable errors (5xx responses, connection issues, timeouts, 408/429/401/403)
 - If all initial retries fail, creates a retry record for scheduler-based recovery
+- Sends initial failure notification when entering retry mode
 
-### 2. Scheduler-Based Recovery (Every 12 hours)
+### 2. Scheduler-Based Recovery (Configurable interval)
 - Processes all PENDING retry records using the same retry logic as initial execution
 - Tracks attempt counts (scheduler attempts only, not Reactor retries)
 - Updates retry records with success/failure status
+- Increments attempt count on each scheduler failure
 
-### 3. Exhaustion Policy (14 days)
-- Marks retries as RETRY_EXHAUSTED after configurable threshold
+### 3. Exhaustion Policy (Configurable threshold)
+- Marks retries as RETRY_EXHAUSTED after configurable threshold (default: 30 seconds for testing, typically longer in production)
+- Sends exhaustion notification when threshold is exceeded
 - Prevents infinite retry attempts
 
 ### 4. Email Notifications
-- **First failure**: When entering retry mode
-- **Success**: When retry succeeds after initial failure
-- **Exhaustion**: When retries are exhausted after 14 days
+- **First failure**: `sendResponseUriFailed()` when entering retry mode
+- **Success**: `sendCertificationUploaded()` when retry succeeds after initial failure
+- **Exhaustion**: `sendResponseUriExhausted()` when retries are exhausted
+- **HTML response**: `sendResponseUriAcceptedWithHtml()` if marketplace provides custom HTML response
 - No notifications for intermediate retry attempts
 
 ## Configuration
@@ -34,28 +38,43 @@ The retry behavior can be customized via method parameters when calling the serv
 // Default values (can be overridden)
 private static final int INITIAL_RETRY_ATTEMPTS = 3;
 private static final Duration[] INITIAL_RETRY_DELAYS = {
-    Duration.ofMinutes(1),   // First retry after 1 minute
-    Duration.ofMinutes(5),   // Second retry after 5 minutes  
-    Duration.ofMinutes(15)   // Third retry after 15 minutes
+    Duration.ofSeconds(5),    // First retry after 5 seconds
+    Duration.ofSeconds(10),   // Second retry after 10 seconds  
+    Duration.ofSeconds(15)    // Third retry after 15 seconds
+    // Note: Original config with minutes commented out for deployment customization:
+    // Duration.ofMinutes(1),   // First retry after 1 minute
+    // Duration.ofMinutes(5),   // Second retry after 5 minutes  
+    // Duration.ofMinutes(15)   // Third retry after 15 minutes
 };
-private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
+private static final Duration EXHAUSTION_THRESHOLD = Duration.ofSeconds(30);
+// (Note: This is for testing; production typically uses Duration.ofMinutes(2) or longer)
 ```
 
 ### Usage Examples
 
 ```java
-// Using default retry parameters
-procedureRetryService.executeUploadLabelToResponseUri(payload);
+// Handle initial action (automatically retries and creates retry record if needed)
+UUID procedureId = UUID.randomUUID();
+LabelCredentialDeliveryPayload payload = new LabelCredentialDeliveryPayload(...);
+procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload);
 
-// Using custom retry parameters
-Duration[] customDelays = {Duration.ofMinutes(2), Duration.ofMinutes(10), Duration.ofMinutes(30)};
-procedureRetryService.executeUploadLabelToResponseUri(payload, 5, customDelays);
+// Process all pending retries (typically called by scheduler)
+procedureRetryService.processPendingRetries();
 
-// Using default exhaustion threshold
+// Manually retry a specific action
+procedureRetryService.retryAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
+
+// Mark retry as completed
+procedureRetryService.markRetryAsCompleted(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
+
+// Mark old pending retries as exhausted (using default 30-second threshold)
 procedureRetryService.markRetryAsExhausted();
 
-// Using custom exhaustion threshold (7 days instead of 14)
-procedureRetryService.markRetryAsExhausted(Duration.ofDays(7));
+// Mark old pending retries as exhausted (using custom 2-minute threshold)
+procedureRetryService.markRetryAsExhausted(Duration.ofMinutes(2));
+
+// Create retry record manually
+procedureRetryService.createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload);
 ```
 
 ## Database Schema
@@ -72,38 +91,67 @@ procedureRetryService.markRetryAsExhausted(Duration.ofDays(7));
 
 ## Integration Points
 
-### CredentialSignerWorkflowImpl
-- **Before**: Direct call to `credentialDeliveryService.sendVcToResponseUri()`
-- **After**: Calls `deliverLabelCredentialWithRetry()` which handles both initial attempts and retry record creation
-- **M2M Authentication**: Still present, moved to `ProcedureRetryService.executeUploadLabelToResponseUri()`
+### Workflow Integration
+- Called via `ProcedureRetryService.handleInitialAction()` after credential signing
+- Handles both immediate delivery and retry record creation on failure
+- Sends appropriate notifications (success, initial failure, or exhaustion)
+
+### Scheduler Integration
+- `ProcedureRetryService.processPendingRetries()` processes all PENDING retry records
+- Called by a scheduled task at configurable intervals
+- Reuses the same delivery and retry logic as initial execution
+- Updates attempt counts and status for each retry
 
 ### Components Added
 - `ProcedureRetryService`: Service interface for retry operations
 - `ProcedureRetryServiceImpl`: Implementation with configurable retry logic
-- `RetryScheduler`: Scheduled task running every 12 hours
-- `RetryConfiguration`: Spring Boot configuration properties
-- `LabelCredentialDeliveryPayload`: Payload for delivery/retry operations
-- `ActionType` & `RetryStatus`: Enums for action types and retry status
+- `ProcedureRetryRepository`: Data access for retry records
+- `RetryScheduler`: Scheduled task for processing pending retries
+- `LabelCredentialDeliveryPayload`: Payload DTO for delivery/retry operations
+- `ActionType`: Enum for action types (UPLOAD_LABEL_TO_RESPONSE_URI, etc.)
+- `RetryStatus`: Enum for retry status (PENDING, COMPLETED, RETRY_EXHAUSTED)
 
 ## Error Handling
 
 ### Recoverable Errors (Will Retry)
-- 5xx server errors (`WebClientResponseException` with 5xx status)
-- Connection exceptions (`ConnectException`)
-- Timeout exceptions (`TimeoutException`)
-- WebClient request exceptions (`WebClientRequestException`)
+- **5xx server errors** (500-599 and similar exceptions)
+- **408 Request Timeout**
+- **429 Too Many Requests**
+- **401 Unauthorized**
+- **403 Forbidden**
+- **Connection errors** (`ConnectException`)
+- **Timeout exceptions** (`TimeoutException`)
+- **WebClient request exceptions** (`WebClientRequestException`) 
+- **ResponseUriDeliveryException** with any of above status codes
 
 ### Non-Recoverable Errors (Will Not Retry)
-- 4xx client errors
-- Authentication/authorization failures
+- 4xx client errors (except 408, 429, 401, 403)
 - Validation errors
+- Other non-retryable exceptions
 
 ## Usage
 
 ### For Label Credential Delivery
 ```java
-// The workflow automatically handles retry on failure
-credentialSignerWorkflow.signAndUpdateCredentialByProcedureId(token, procedureId, format);
+// The service automatically handles retry on failure
+// Called from CredentialSignerWorkflow or similar
+UUID procedureId = UUID.randomUUID();
+LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
+    .credentialId("cred-123")
+    .responseUri("https://marketplace.example.com/callback")
+    .signedCredential("vc_jwt_token")
+    .companyEmail("company@example.com")
+    .build();
+
+procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload);
+// Returns Mono<Void>, will attempt delivery with retries, create retry record if needed, and send notifications
+```
+
+### For Scheduler Processing
+```java
+// Called by scheduled task (e.g., every 12 hours)
+procedureRetryService.processPendingRetries();
+// Processes all PENDING retry records, updates status, sends notifications
 ```
 
 ### For Manual Retry Operations
@@ -113,13 +161,43 @@ procedureRetryService.retryAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPON
 
 // Mark as completed manually
 procedureRetryService.markRetryAsCompleted(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
+
+// Mark old pending retries as exhausted
+procedureRetryService.markRetryAsExhausted(Duration.ofMinutes(2));
 ```
 
-### Extending for New Actions
-1. Add new enum to `ActionType`
-2. Create payload DTO for the action
-3. Add case to `ProcedureRetryServiceImpl.executeRetryAction()`
-4. Implement action-specific retry logic
+## Extending for New Actions
+
+To add support for a new action type:
+
+1. Add new action to `ActionType` enum:
+   ```java
+   public enum ActionType {
+       UPLOAD_LABEL_TO_RESPONSE_URI,
+       YOUR_NEW_ACTION
+   }
+   ```
+
+2. Create a payload DTO for your action (similar to `LabelCredentialDeliveryPayload`)
+
+3. Add a handler method in `ProcedureRetryServiceImpl`:
+   ```java
+   private Mono<Void> handleScheduledYourNewAction(ProcedureRetry retryRecord) {
+       // Implement your action-specific retry logic
+   }
+   ```
+
+4. Add case to `executeRetryAction()` switch statement:
+   ```java
+   private Mono<Void> executeRetryAction(ProcedureRetry retryRecord) {
+       return switch (retryRecord.getActionType()) {
+           case UPLOAD_LABEL_TO_RESPONSE_URI -> handleScheduledLabelDelivery(retryRecord);
+           case YOUR_NEW_ACTION -> handleScheduledYourNewAction(retryRecord);
+       };
+   }
+   ```
+
+5. Call from initial workflow similarly to `handleInitialAction()`
 
 ## Monitoring
 
