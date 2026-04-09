@@ -17,6 +17,7 @@ import es.in2.issuer.backend.shared.domain.util.factory.IssuerFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialMachineFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LabelCredentialFactory;
+import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedureRepository;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,9 @@ class CredentialSignerWorkflowImplTest {
 
     @Mock
     private CredentialDeliveryService credentialDeliveryService;
+
+    @Mock
+    private ProcedureRetryService procedureRetryService;
 
     @Mock
     private AppConfig appConfig;
@@ -731,5 +735,47 @@ class CredentialSignerWorkflowImplTest {
 
         assertFalse(payloadToSign.contains("\"sub\""),
                 "No debe añadir sub si no encuentra ningún credentialSubject.id válido en el array");
+    }
+
+    @Test
+    void retrySignUnsignedCredential_LabelCredential_withResponseUri_triggersFireAndForgetDelivery() {
+        CredentialProcedure initialProcedure = mock(CredentialProcedure.class);
+        when(initialProcedure.getCredentialType()).thenReturn(LABEL_CREDENTIAL_TYPE);
+        when(initialProcedure.getCredentialStatus()).thenReturn(CredentialStatusEnum.PEND_SIGNATURE);
+
+        CredentialProcedure updatedProcedure = mock(CredentialProcedure.class);
+        when(updatedProcedure.getCredentialType()).thenReturn(LABEL_CREDENTIAL_TYPE);
+        when(updatedProcedure.getEmail()).thenReturn("company@example.com");
+
+        when(accessTokenService.getCleanBearerToken(authorizationHeader)).thenReturn(Mono.just(token));
+        when(backofficePdpService.validateSignCredential(processId, token, procedureId)).thenReturn(Mono.empty());
+        when(accessTokenService.getMandateeEmail(authorizationHeader)).thenReturn(Mono.just(email));
+
+        when(credentialProcedureRepository.findByProcedureId(UUID.fromString(procedureId)))
+                .thenReturn(Mono.just(initialProcedure), Mono.just(updatedProcedure));
+
+        when(issuerFactory.createSimpleIssuerAndNotifyOnError(procedureId, email)).thenReturn(Mono.just(simpleIssuer));
+        when(labelCredentialFactory.mapIssuer(procedureId, simpleIssuer)).thenReturn(Mono.just("bindedVc"));
+        when(credentialProcedureService.updateDecodedCredentialByProcedureId(procedureId, "bindedVc", JWT_VC))
+                .thenReturn(Mono.empty());
+
+        doReturn(Mono.just("signedVc")).when(credentialSignerWorkflow).signAndUpdateCredentialByProcedureId(token, procedureId, JWT_VC);
+        when(credentialProcedureService.updateCredentialProcedureCredentialStatusToValidByProcedureId(procedureId))
+                .thenReturn(Mono.empty());
+        when(credentialProcedureRepository.save(any())).thenReturn(Mono.just(updatedProcedure));
+
+        when(deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId))
+                .thenReturn(Mono.just("https://response.example.com/callback"));
+        when(credentialProcedureService.getCredentialId(updatedProcedure)).thenReturn(Mono.just("cred-id-123"));
+        when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
+                .thenReturn(Mono.empty());
+
+        StepVerifier.create(credentialSignerWorkflow.retrySignUnsignedCredential(processId, authorizationHeader, procedureId))
+                .verifyComplete();
+
+        verify(deferredCredentialMetadataService).getResponseUriByProcedureId(procedureId);
+        verify(credentialProcedureService).getCredentialId(updatedProcedure);
+        // handleInitialAction is called synchronously (before .subscribe()) so it is recorded by Mockito
+        verify(procedureRetryService).handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any());
     }
 }

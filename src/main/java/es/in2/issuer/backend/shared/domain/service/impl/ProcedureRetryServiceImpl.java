@@ -10,7 +10,6 @@ import es.in2.issuer.backend.shared.domain.model.enums.RetryStatus;
 import es.in2.issuer.backend.shared.domain.service.*;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import es.in2.issuer.backend.shared.infrastructure.repository.ProcedureRetryRepository;
-import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
