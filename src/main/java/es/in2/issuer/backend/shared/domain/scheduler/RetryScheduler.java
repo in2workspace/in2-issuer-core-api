@@ -18,7 +18,7 @@ public class RetryScheduler {
 
     private final ProcedureRetryService procedureRetryService;
 
-    @Scheduled(fixedRate = 5 * 1000) // todo remove
+    @Scheduled(fixedRate = 75 * 1000) // todo remove
 //    @Scheduled(fixedRate = 12 * 60 * 60 * 1000) // Every 12 hours (in milliseconds)
     public Mono<Void> processRetries() {
         log.info("[RETRY-TEST] [RetryScheduler] Scheduled Task - Executing retry processing at: {}", Instant.now());
