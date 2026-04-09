@@ -91,8 +91,18 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     @Override
     public Mono<Void> processPendingRetries() {
         return procedureRetryRepository.findByStatus(RetryStatus.PENDING)
-                .flatMap(this::executeRetryAction)
-                .onErrorContinue((error, item) -> log.warn("[SCHEDULER] Continuing after error processing retry: {}", error.getMessage()))
+                .flatMap(retryRecord ->
+                        executeRetryAction(retryRecord)
+                                .onErrorResume(error -> {
+                                    log.warn(
+                                            "[SCHEDULER] Continuing after error processing retry for procedure {}: {}",
+                                            retryRecord.getProcedureId(),
+                                            error.getMessage(),
+                                            error
+                                    );
+                                    return Mono.empty();
+                                })
+                )
                 .then()
                 .doOnSuccess(unused -> log.info("[SCHEDULER] Completed processing all pending retries"));
     }
@@ -108,17 +118,23 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 retryRecord.getAttemptCount() + 1, retryRecord.getProcedureId(), retryRecord.getActionType());
 
         return deserializePayload(retryRecord)
-                .flatMap(payload -> deliverLabelWithImmediateRetries(payload)
-                        .flatMap(result -> {
-                            log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
-                            return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
-                                    .then(sendSuccessNotificationSafely(payload.companyEmail(), payload.credentialId(), result));
-                        })
-                        .onErrorResume(e -> {
-                            log.warn("[SCHEDULER] Delivery failed for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage());
-                            return updateRetryAfterScheduledFailure(retryRecord);
-                        })
-                );
+                .flatMap(payload ->
+                        deliverLabelWithImmediateRetries(payload)
+                                .flatMap(result -> {
+                                    log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
+                                    return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
+                                            .then(sendSuccessNotificationSafely(
+                                                    payload.companyEmail(),
+                                                    payload.credentialId(),
+                                                    result
+                                            ));
+                                })
+                )
+                .onErrorResume(e -> {
+                    log.warn("[SCHEDULER] Delivery failed for procedure {}: {}",
+                            retryRecord.getProcedureId(), e.getMessage(), e);
+                    return updateRetryAfterScheduledFailure(retryRecord);
+                });
     }
 
     // ──────────────────────────────────────────────────────────────────────
