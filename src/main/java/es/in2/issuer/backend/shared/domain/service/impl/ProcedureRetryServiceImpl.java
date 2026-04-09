@@ -49,7 +49,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 //            Duration.ofMinutes(5),
 //            Duration.ofMinutes(15)
     };
-    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofMinutes(2);
+    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofSeconds(30);
 
     // ──────────────────────────────────────────────────────────────────────
     // A. Initial Issuance Orchestration
