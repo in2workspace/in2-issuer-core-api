@@ -90,6 +90,12 @@ class CredentialIssuanceWorkflowImplTest {
     @Mock
     private CredentialIssuerMetadataService credentialIssuerMetadataService;
 
+    @Mock
+    private ProcedureRetryService procedureRetryService;
+
+    @Mock
+    private es.in2.issuer.backend.shared.domain.util.JwtUtils jwtUtils;
+
     @InjectMocks
     private CredentialIssuanceWorkflowImpl verifiableCredentialIssuanceWorkflow;
 
@@ -735,22 +741,9 @@ class CredentialIssuanceWorkflowImplTest {
                 .thenReturn(Mono.just("DECODED_SHOULD_NOT_BE_USED"));
 
         when(credentialProcedureService.getCredentialId(proc)).thenReturn(Mono.just("cred-777"));
-        when(m2MTokenService.getM2MToken())
-                .thenReturn(Mono.just(new VerifierOauth2AccessToken("access-token-value", "", "")));
 
-        ArgumentCaptor<String> responseUriCap = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> encodedCap = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> credIdCap = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> emailCap = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> accessTokenCap = ArgumentCaptor.forClass(String.class);
-
-        when(credentialDeliveryService.sendVcToResponseUri(
-                responseUriCap.capture(),
-                encodedCap.capture(),
-                credIdCap.capture(),
-                emailCap.capture(),
-                accessTokenCap.capture()
-        )).thenReturn(Mono.empty());
+        when(procedureRetryService.handleInitialLabelDelivery(any(), any()))
+                .thenReturn(Mono.empty());
 
         StepVerifier.create(
                 verifiableCredentialIssuanceWorkflow.generateVerifiableCredentialResponse(
@@ -760,12 +753,7 @@ class CredentialIssuanceWorkflowImplTest {
                 )
         ).expectNext(cr).verifyComplete();
 
-        // asserts
-        org.junit.jupiter.api.Assertions.assertEquals(responseUri, responseUriCap.getValue());
-        org.junit.jupiter.api.Assertions.assertEquals("ENCODED_JWT_VALUE", encodedCap.getValue());
-        org.junit.jupiter.api.Assertions.assertEquals("cred-777", credIdCap.getValue());
-        org.junit.jupiter.api.Assertions.assertEquals("owner@in2.es", emailCap.getValue());
-        org.junit.jupiter.api.Assertions.assertEquals("access-token-value", accessTokenCap.getValue());
+        verify(procedureRetryService).handleInitialLabelDelivery(any(), eq(UUID.fromString(procedureId)));
     }
 
     @Test

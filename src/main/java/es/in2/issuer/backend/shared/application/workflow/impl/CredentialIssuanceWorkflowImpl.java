@@ -10,13 +10,11 @@ import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDelive
 import es.in2.issuer.backend.shared.domain.model.entities.CredentialProcedure;
 import es.in2.issuer.backend.shared.domain.model.entities.DeferredCredentialMetadata;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialType;
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
 import es.in2.issuer.backend.shared.domain.service.*;
 import es.in2.issuer.backend.shared.domain.util.JwtUtils;
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFactory;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import es.in2.issuer.backend.shared.infrastructure.config.security.service.VerifiableCredentialPolicyAuthorizationService;
-import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,8 +47,6 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
     private final TrustFrameworkService trustFrameworkService;
     private final LEARCredentialEmployeeFactory credentialEmployeeFactory;
     private final CredentialIssuerMetadataService credentialIssuerMetadataService;
-    private final M2MTokenService m2mTokenService;
-    private final CredentialDeliveryService credentialDeliveryService;
     private final ProcedureRetryService procedureRetryService;
     private final JwtUtils jwtUtils;
 
@@ -392,33 +388,15 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                     }
 
                                     return credentialProcedureService.getCredentialId(credentialProcedure)
-                                            .doOnNext(credentialId -> log.debug("Using credentialId for delivery: {}", credentialId))
                                             .flatMap(credentialId -> {
-                                                // Use retry-enabled delivery mechanism
                                                 LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
                                                         .responseUri(deferred.getResponseUri())
                                                         .signedCredential(encodedCredential)
                                                         .credentialId(credentialId)
                                                         .companyEmail(credentialProcedure.getEmail())
                                                         .build();
-                                                return procedureRetryService.executeUploadLabelToResponseUri(payload)
-                                                        .onErrorResume(e -> {
-                                                            log.warn("[RETRY-TEST] [CredentialIssuanceWorkflow] Initial delivery failed for procedureId={}, creating retry record. Reason: {}",
-                                                                    updatedCredentialProcedure.getProcedureId(), e.getMessage(), e);
-                                                            // Create retry record for scheduler-based recovery
-                                                            return procedureRetryService.createRetryRecord(
-                                                                    updatedCredentialProcedure.getProcedureId(),
-                                                                    ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
-                                                                    payload
-                                                            )
-                                                            .doOnSuccess(unused -> log.info("[RETRY-TEST] [CredentialIssuanceWorkflow] Created retry record for procedureId={}", 
-                                                                    updatedCredentialProcedure.getProcedureId()))
-                                                            .onErrorResume(retryError -> {
-                                                                log.error("[RETRY-TEST] [CredentialIssuanceWorkflow] ERROR: Failed to create retry record for procedureId={} - {}",
-                                                                        updatedCredentialProcedure.getProcedureId(), retryError.getMessage(), retryError);
-                                                                return Mono.empty(); // Don't fail the main flow
-                                                            });
-                                                        });
+                                                return procedureRetryService.handleInitialLabelDelivery(
+                                                        payload, updatedCredentialProcedure.getProcedureId());
                                             });
                                 }
 

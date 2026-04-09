@@ -404,7 +404,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
             .build();
 
         log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Invoking executeUploadLabelToResponseUri for procedureId={}", procedureId);
-        return procedureRetryService.executeUploadLabelToResponseUri(payload)
+        return procedureRetryService.handleInitialLabelDelivery(payload, procedureId)
             .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] SUCCESS: Label credential delivered to response URI for procedureId={}", procedureId))
             .doOnError(e -> log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Delivery failed for procedureId={} - {}", procedureId, e.getMessage(), e))
             .onErrorResume(e -> {
