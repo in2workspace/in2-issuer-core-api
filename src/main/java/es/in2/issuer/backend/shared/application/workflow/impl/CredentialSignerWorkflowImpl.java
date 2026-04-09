@@ -413,7 +413,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                 return Mono.empty();
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .subscribe(); // Fire-and-forget: don't wait for completion
+            .subscribe();
         
         // Main flow continues immediately without waiting for upload
         return Mono.empty();
