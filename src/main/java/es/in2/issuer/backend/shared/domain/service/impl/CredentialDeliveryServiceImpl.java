@@ -23,7 +23,7 @@ public class CredentialDeliveryServiceImpl implements CredentialDeliveryService 
     private final WebClientConfig webClient;
 
     private static final boolean TEST_FORCE_RANDOM_SUCCESS = true;
-    private static final double TEST_SUCCESS_PROBABILITY = 0.25;
+    private static final double TEST_SUCCESS_PROBABILITY = 0.1;
 
     //todo restore to real implementation and remove test simulation logic
     @Override

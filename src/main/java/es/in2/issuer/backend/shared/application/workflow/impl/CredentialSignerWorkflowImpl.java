@@ -409,20 +409,10 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
             .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] SUCCESS: Label credential delivered to response URI for procedureId={}", procedureId))
             .doOnError(e -> log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Delivery failed for procedureId={} - {}", procedureId, e.getMessage(), e))
             .onErrorResume(e -> {
-                log.warn("[RETRY-TEST] [deliverLabelCredentialWithRetry] Initial delivery failed for procedureId={}, creating retry record. Reason: {}", 
+                // ProcedureRetryService already handles retry record creation internally
+                log.warn("[RETRY-TEST] [deliverLabelCredentialWithRetry] Delivery failed for procedureId={}, retry record created by service. Reason: {}", 
                      procedureId, e.getMessage(), e);
-                // Create retry record for scheduler-based recovery
-                return procedureRetryService.createRetryRecord(
-                    procedureId, 
-                    ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, 
-                    payload
-                )
-                .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Created retry record for procedureId={}", procedureId))
-                .onErrorResume(retryError -> {
-                log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Failed to create retry record for procedureId={} - {}", 
-                     procedureId, retryError.getMessage(), retryError);
                 return Mono.empty(); // Don't fail the main flow
-                });
             });
     }
 }
