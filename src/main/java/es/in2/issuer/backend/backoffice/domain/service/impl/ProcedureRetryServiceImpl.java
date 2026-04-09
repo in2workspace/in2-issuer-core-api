@@ -41,15 +41,15 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // Retry configuration constants
     private static final int INITIAL_RETRY_ATTEMPTS = 3;
     private static final Duration[] INITIAL_RETRY_DELAYS = {
-//  todo remove seconds          Duration.ofSeconds(5),
-//            Duration.ofSeconds(10),
-//            Duration.ofSeconds(15)
-            Duration.ofMinutes(1),
-            Duration.ofMinutes(5),
-            Duration.ofMinutes(15)
+  Duration.ofSeconds(5),
+            Duration.ofSeconds(10),
+            Duration.ofSeconds(15)
+//            Duration.ofMinutes(1),
+//            Duration.ofMinutes(5),
+//            Duration.ofMinutes(15)
     };
-//   TODO remove after tests private static final Duration EXHAUSTION_THRESHOLD = Duration.ofSeconds(30);
-    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
+   private static final Duration EXHAUSTION_THRESHOLD = Duration.ofSeconds(30);
+//   TODO resotre private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
 
     // ──────────────────────────────────────────────────────────────────────
     // A. Initial Issuance Orchestration
@@ -278,8 +278,8 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
             log.warn("[NOTIFICATION] No email available for failure notification, credId: {}", credentialId);
             return Mono.empty();
         }
-
-        return emailService.sendResponseUriFailed(email, credentialId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
+    // TODO restore sendResponseUriExhausted for sendResponseUriFailed
+        return emailService.sendResponseUriExhausted(email, credentialId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
                 .doOnSuccess(unused -> log.info("[NOTIFICATION] Failure email sent for credId: {}", credentialId))
                 .onErrorResume(e -> {
                     log.error("[NOTIFICATION] Failed to send failure email for credId: {}: {}", credentialId, e.getMessage());
