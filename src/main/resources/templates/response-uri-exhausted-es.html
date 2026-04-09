@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificación en el Marketplace - Acción Requerida</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      border: 1px solid #ddd;
+    }
+    .header {
+      background-color: #d73502;
+      color: #fff;
+      padding: 10px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 20px;
+      text-align: center;
+    }
+    .content p {
+      margin: 0 0 15px;
+    }
+    .action-section {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .action-section h3 {
+      margin: 0 0 10px;
+      color: #224178;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #224178;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    .support-info {
+      background-color: #e7f3ff;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+      border-left: 4px solid #224178;
+    }
+    .footer {
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Certificación en el Marketplace - Acción Requerida</h1>
+  </div>
+  <div class="content">
+    <p>
+      <strong>Se han agotado todos los intentos automáticos de reintento</strong> para la certificación en el Marketplace para la credencial con ID:
+      <strong><span th:text="${productId}">PRODUCT ID</span></strong>
+    </p>
+    
+    <p>
+      El sistema intentó subir automáticamente su certificación varias veces, pero no pudo completar el proceso.
+      <strong>Su credencial NO será subida automáticamente.</strong>
+    </p>
+
+    <div class="action-section">
+      <h3>Qué puede hacer:</h3>
+      <p>Tiene dos opciones para resolver esta incidencia:</p>
+      
+      <p>
+        <strong>Opción 1: Subida Manual</strong><br/>
+        Siga nuestra guía paso a paso para subir manualmente su certificación:
+      </p>
+      <a th:href="${guideUrl}" target="_blank" class="button">Ver Guía de Subida Manual</a>
+      
+      <p style="margin-top: 20px;">
+        <strong>Opción 2: Contactar Soporte</strong><br/>
+        Si prefiere asistencia, nuestro equipo de soporte está listo para ayudarle.
+      </p>
+    </div>
+
+    <div class="support-info">
+      <p><strong>¿Necesita ayuda?</strong> Contacte con nuestro equipo de soporte si encuentra algún problema o necesita asistencia con el proceso de subida manual.</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>Este es un mensaje automático. Le rogamos no responda a este email.</p>
+  </div>
+</div>
+</body>
+</html>

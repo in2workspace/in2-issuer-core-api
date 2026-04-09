@@ -243,7 +243,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                                     log.warn("[RETRY] Failed to mark retry as exhausted for procedure {} (record may have been modified)", record.getProcedureId());
                                 }
                             })
-                            .then();
+                            .then(sendExhaustionNotificationSafely(record));
                 })
                 .then();
     }
@@ -287,6 +287,34 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 .doOnSuccess(unused -> log.info("[NOTIFICATION] Failure email sent for credId: {}", credentialId))
                 .onErrorResume(e -> {
                     log.error("[NOTIFICATION] Failed to send failure email for credId: {}: {}", credentialId, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    private Mono<Void> sendExhaustionNotificationSafely(ProcedureRetry retryRecord) {
+        return deserializePayload(retryRecord)
+                .flatMap(payload -> {
+                    if (payload.companyEmail() == null || payload.companyEmail().isBlank()) {
+                        log.warn("[NOTIFICATION] No email available for exhaustion notification, procedure: {}", retryRecord.getProcedureId());
+                        return Mono.empty();
+                    }
+
+                    return emailService.sendResponseUriExhausted(
+                            payload.companyEmail(), 
+                            payload.credentialId(), 
+                            appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
+                    )
+                    .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent for procedure: {}, credId: {}", 
+                            retryRecord.getProcedureId(), payload.credentialId()))
+                    .onErrorResume(e -> {
+                        log.error("[NOTIFICATION] Failed to send exhaustion email for procedure: {}, credId: {}: {}", 
+                                retryRecord.getProcedureId(), payload.credentialId(), e.getMessage());
+                        return Mono.empty();
+                    });
+                })
+                .onErrorResume(e -> {
+                    log.error("[NOTIFICATION] Failed to deserialize payload for exhaustion notification, procedure: {}: {}", 
+                            retryRecord.getProcedureId(), e.getMessage());
                     return Mono.empty();
                 });
     }

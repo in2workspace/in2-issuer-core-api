@@ -176,6 +176,26 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl) {
+        return Mono.fromCallable(() -> {
+            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8);
+            helper.setFrom(mailProperties.getUsername());
+            helper.setTo(to);
+            helper.setSubject(translationService.translate("email.retry-exhausted-submission"));
+
+            Context context = new Context();
+            context.setVariable("productId", productId);
+            context.setVariable("guideUrl", guideUrl);
+            String htmlContent = templateEngine.process("response-uri-exhausted-" + translationService.getLocale(), context);
+            helper.setText(htmlContent, true);
+
+            javaMailSender.send(mimeMessage);
+            return null;
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    @Override
     public Mono<Void> sendResponseUriAcceptedWithHtml(String to, String productId, String htmlContent) {
         return Mono.fromCallable(() -> {
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();

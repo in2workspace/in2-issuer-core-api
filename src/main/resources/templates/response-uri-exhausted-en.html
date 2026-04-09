@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certification Submission - Automatic Retries Exhausted</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      border: 1px solid #ddd;
+    }
+    .header {
+      background-color: #d73502;
+      color: #fff;
+      padding: 10px;
+      border-radius: 8px 8px 0 0;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .content {
+      padding: 20px;
+      text-align: center;
+    }
+    .content p {
+      margin: 0 0 15px;
+    }
+    .action-section {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    .action-section h3 {
+      margin: 0 0 10px;
+      color: #224178;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #224178;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    .support-info {
+      background-color: #e7f3ff;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 20px 0;
+      border-left: 4px solid #224178;
+    }
+    .footer {
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Certification Submission - Action Required</h1>
+  </div>
+  <div class="content">
+    <p>
+      <strong>All automatic retry attempts have been exhausted</strong> for the certification submission to the Marketplace for credential ID:
+      <strong><span th:text="${productId}">PRODUCT ID</span></strong>
+    </p>
+    
+    <p>
+      The system tried to automatically upload your certification multiple times, but was unable to complete the process.
+      <strong>Your credential will NOT be automatically uploaded.</strong>
+    </p>
+
+    <div class="action-section">
+      <h3>What you can do:</h3>
+      <p>You have two options to resolve this issue:</p>
+      
+      <p>
+        <strong>Option 1: Manual Upload</strong><br/>
+        Follow our step-by-step guide to manually upload your certification:
+      </p>
+      <a th:href="${guideUrl}" target="_blank" class="button">View Manual Upload Guide</a>
+      
+      <p style="margin-top: 20px;">
+        <strong>Option 2: Contact Support</strong><br/>
+        If you prefer assistance, our support team is ready to help you.
+      </p>
+    </div>
+
+    <div class="support-info">
+      <p><strong>Need help?</strong> Contact our support team if you encounter any issues or need assistance with the manual upload process.</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>This is an automated message. Please do not reply to this email.</p>
+  </div>
+</div>
+</body>
+</html>
