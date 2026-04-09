@@ -38,6 +38,7 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
@@ -403,16 +404,19 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
             .companyEmail(companyEmail)
             .build();
 
-        log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Invoking executeUploadLabelToResponseUri for procedureId={}", procedureId);
-        return procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
-                payload)
+        // Execute delivery as fire-and-forget (completely parallel)
+        procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
             .doOnSuccess(unused -> log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] SUCCESS: Label credential delivered to response URI for procedureId={}", procedureId))
             .doOnError(e -> log.error("[RETRY-TEST] [deliverLabelCredentialWithRetry] ERROR: Delivery failed for procedureId={} - {}", procedureId, e.getMessage(), e))
             .onErrorResume(e -> {
-                // ProcedureRetryService already handles retry record creation internally
                 log.warn("[RETRY-TEST] [deliverLabelCredentialWithRetry] Delivery failed for procedureId={}, retry record created by service. Reason: {}", 
                      procedureId, e.getMessage(), e);
-                return Mono.empty(); // Don't fail the main flow
-            });
+                return Mono.empty();
+            })
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(); // Fire-and-forget: don't wait for completion
+        
+        // Main flow continues immediately without waiting for upload
+        return Mono.empty();
     }
 }

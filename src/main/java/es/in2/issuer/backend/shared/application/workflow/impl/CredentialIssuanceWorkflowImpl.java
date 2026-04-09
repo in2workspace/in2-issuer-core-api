@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 
 import javax.naming.ConfigurationException;
@@ -397,20 +398,22 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                                         .companyEmail(credentialProcedure.getEmail())
                                                         .build();
                                                 
-                                                // Execute delivery as non-blocking side effect
-                                                return procedureRetryService.handleInitialAction(updatedCredentialProcedure.getProcedureId(), ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
-                                                        payload)
+                                                // Execute delivery as fire-and-forget (completely parallel)
+                                                procedureRetryService.handleInitialAction(updatedCredentialProcedure.getProcedureId(), ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
                                                         .doOnSuccess(unused -> log.info("[{}] SUCCESS: Label credential delivered to response URI for procedureId={}", 
                                                             processId, updatedCredentialProcedure.getProcedureId()))
                                                         .doOnError(e -> log.error("[{}] ERROR: Label delivery failed for procedureId={} - {}", 
                                                             processId, updatedCredentialProcedure.getProcedureId(), e.getMessage(), e))
                                                         .onErrorResume(e -> {
-                                                            // ProcedureRetryService already handles retry record creation internally
                                                             log.warn("[{}] Label delivery failed for procedureId={}, retry record created by service. Reason: {}", 
                                                                 processId, updatedCredentialProcedure.getProcedureId(), e.getMessage(), e);
-                                                            return Mono.empty(); // Don't fail the main flow
+                                                            return Mono.empty();
                                                         })
-                                                        .then(Mono.empty()); // Always return empty so main flow continues
+                                                        .subscribeOn(Schedulers.boundedElastic())
+                                                        .subscribe(); // Fire-and-forget: don't wait for completion
+                                                
+                                                // Main flow continues immediately without waiting for upload
+                                                return Mono.empty();
                                             });
                                 }
 
