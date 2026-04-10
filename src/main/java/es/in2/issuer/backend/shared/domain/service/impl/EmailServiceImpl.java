@@ -34,6 +34,8 @@ import static es.in2.issuer.backend.backoffice.domain.util.Constants.UTF_8;
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
+    private static final String PRODUCT_ID = "productId";
+
     private final JavaMailSender javaMailSender;
     private final TemplateEngine templateEngine;
     private final MailProperties mailProperties;
@@ -165,7 +167,7 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(translationService.translate("email.unsuccessful-submission"));
 
             Context context = new Context();
-            context.setVariable("productId", productId);
+            context.setVariable(PRODUCT_ID, productId);
             context.setVariable("guideUrl", guideUrl);
             String htmlContent = templateEngine.process("response-uri-failed-" + translationService.getLocale(), context);
             helper.setText(htmlContent, true);
@@ -185,7 +187,7 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(translationService.translate("email.retry-exhausted-submission"));
 
             Context context = new Context();
-            context.setVariable("productId", productId);
+            context.setVariable(PRODUCT_ID, productId);
             context.setVariable("guideUrl", guideUrl);
             String htmlContent = templateEngine.process("response-uri-exhausted-" + translationService.getLocale(), context);
             helper.setText(htmlContent, true);
@@ -205,7 +207,7 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(translationService.translate("email.certification-uploaded"));
 
             Context context = new Context();
-            context.setVariable("productId", productId);
+            context.setVariable(PRODUCT_ID, productId);
             String htmlContent = templateEngine.process("certification-uploaded-" + translationService.getLocale(), context);
             helper.setText(htmlContent, true);
 
