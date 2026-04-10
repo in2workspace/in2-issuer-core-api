@@ -42,7 +42,7 @@ public interface ProcedureRetryRepository extends ReactiveCrudRepository<Procedu
             VALUES 
                 (:#{#retry.id}, :#{#retry.procedureId}, :#{#retry.actionType}, :#{#retry.status}, 
                  :#{#retry.attemptCount}, :#{#retry.firstFailureAt}, :#{#retry.payload}, 
-                 :#{#retry.createdAt}, :#{#retry.updatedAt})
+                 NOW(), NOW())
             ON CONFLICT (procedure_id, action_type) 
             DO UPDATE SET 
                 status = EXCLUDED.status,
