@@ -1,7 +1,6 @@
 package es.in2.issuer.backend.shared.domain.service.impl;
 
 import es.in2.issuer.backend.shared.domain.exception.ResponseUriDeliveryException;
-import es.in2.issuer.backend.shared.domain.model.dto.ResponseUriDeliveryResult;
 import es.in2.issuer.backend.shared.infrastructure.config.WebClientConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
