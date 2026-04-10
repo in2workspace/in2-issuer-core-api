@@ -393,7 +393,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
     private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
                                                        String credentialId, String companyEmail, 
                                                        UUID procedureId) {
-        log.info("[RETRY-TEST] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
+        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
             procedureId, responseUri, credentialId, companyEmail);
 
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()

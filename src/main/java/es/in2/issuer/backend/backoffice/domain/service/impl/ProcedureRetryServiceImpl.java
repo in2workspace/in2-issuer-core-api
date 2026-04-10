@@ -58,6 +58,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     @Override
     public Mono<Void> handleInitialAction(UUID procedureId, ActionType actionType, Object payload) {
+        log.info("[RETRY] Handling initial action for procedureId={} actionType={}", procedureId, actionType);
         return switch (actionType) {
             case UPLOAD_LABEL_TO_RESPONSE_URI ->
                     handleInitialLabelDeliveryAction(
@@ -91,6 +92,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     @Override
     public Mono<Void> processPendingRetries() {
+        log.info("[RETRY] Starting processing of pending retries");
         return procedureRetryRepository.findByStatus(RetryStatus.PENDING)
                 .flatMap(retryRecord ->
                         executeRetryAction(retryRecord)
@@ -162,7 +164,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     @Override
     public Mono<Void> createRetryRecord(UUID procedureId, ActionType actionType, Object payload) {
-        log.info("[RETRY] Creating retry record for procedureId={} actionType={}", procedureId, actionType);
+        log.debug("[RETRY] Creating retry record for procedureId={} actionType={}", procedureId, actionType);
 
         return Mono.fromCallable(() -> {
                     try {
@@ -187,7 +189,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                     if (rowsAffected == null || rowsAffected == 0) {
                         log.warn("[RETRY] No retry record inserted/updated for procedureId={} actionType={}", procedureId, actionType);
                     } else {
-                        log.info("[RETRY] Upserted retry record for procedureId={} actionType={} (rows: {})", procedureId, actionType, rowsAffected);
+                        log.info("[debug] Upserted retry record for procedureId={} actionType={} (rows: {})", procedureId, actionType, rowsAffected);
                     }
                 })
                 .then()
@@ -213,7 +215,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                     if (rowsAffected == null || rowsAffected == 0) {
                         log.warn("[RETRY] No retry record found to mark as completed for procedure {} action {}", procedureId, actionType);
                     } else {
-                        log.info("[RETRY] Marked retry as completed for procedure {} action {}", procedureId, actionType);
+                        log.debug("[RETRY] Marked retry as completed for procedure {} action {}", procedureId, actionType);
                     }
                 })
                 .then();
@@ -231,13 +233,13 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
         return procedureRetryRepository.findPendingRecordsOlderThan(exhaustionThreshold)
                 .flatMap(retryRecord -> {
-                    log.info("[RETRY] Marking retry as exhausted for procedure {} action {} (first failure at: {})",
+                    log.debug("[RETRY] Marking retry as exhausted for procedure {} action {} (first failure at: {})",
                             retryRecord.getProcedureId(), retryRecord.getActionType(), retryRecord.getFirstFailureAt());
 
                     return procedureRetryRepository.markAsExhausted(retryRecord.getProcedureId(), retryRecord.getActionType())
                             .doOnSuccess(rowsAffected -> {
                                 if (rowsAffected > 0) {
-                                    log.info("[RETRY] Successfully marked retry as exhausted for procedure {}", retryRecord.getProcedureId());
+                                    log.debug("[RETRY] Successfully marked retry as exhausted for procedure {}", retryRecord.getProcedureId());
                                 } else {
                                     log.warn("[RETRY] Failed to mark retry as exhausted for procedure {} (record may have been modified)", retryRecord.getProcedureId());
                                 }
@@ -442,10 +444,8 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     private Mono<LabelCredentialDeliveryPayload> deserializePayload(ProcedureRetry retryRecord) {
-        log.info("deserializePayload: {}", retryRecord);
         return Mono.fromCallable(() -> {
                     try {
-                        log.info("return deserializePayload: {}", retryRecord);
                         return objectMapper.readValue(retryRecord.getPayload(), LabelCredentialDeliveryPayload.class);
                     } catch (Exception e) {
                         log.error("[RETRY] Error deserializing retry payload for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage(), e);
