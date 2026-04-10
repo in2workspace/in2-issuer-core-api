@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certification Successfully Uploaded</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+        .header {
+            background-color: #224178;
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 20px;
+            text-align: center;
+        }
+        .content p {
+            margin: 0 0 15px;
+        }
+        .credential-id {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Certification Successfully Uploaded</h1>
+    </div>
+    <div class="content">
+        <p><strong>Great news!</strong></p>
+        <p>
+            Your product certification has been <strong>successfully uploaded to the Marketplace</strong> for credential ID:
+        </p>
+        <div class="credential-id">
+            <span th:text="${productId}">PRODUCT ID</span>
+        </div>
+        <p>
+            Your product is now certified and available in the Marketplace.
+        </p>
+    </div>
+    <div class="footer">
+        <p>This is an automated message. Please do not reply to this email.</p>
+    </div>
+</div>
+</body>
+</html>

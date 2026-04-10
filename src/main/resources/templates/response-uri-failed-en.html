@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Envío de Certificación Fallido</title>
+  <title>Certification in the Marketplace Failed</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -51,21 +51,21 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>El envío de la certificación al Marketplace ha fallado</h1>
+    <h1>The certification in the Marketplace has failed</h1>
   </div>
   <div class="content">
     <p>
-      No se pudo enviar la certificación para el ID de credencial:
+      The credential with ID:
       <span th:text="${productId}">PRODUCT ID</span>
-      al Marketplace.
+      could not be sent to the Marketplace.
       <br/>
-      Para añadir la certificación manualmente a tus productos, por favor sigue esta guía:
+      During the next few days, the system will try to add the certification to the product. To manually add the certification to the product, please refer to the following guide:
       <br/>
-      <a th:href="${guideUrl}" target="_blank">Haz clic aquí para ver la guía</a>
+      <a th:href="${guideUrl}" target="_blank">Click here to view the guide</a>
     </p>
   </div>
   <div class="footer">
-    <p>Este es un mensaje automático. Por favor, no respondas a este correo.</p>
+    <p>This is an automated message. Please do not reply.</p>
   </div>
 </div>
 </body>

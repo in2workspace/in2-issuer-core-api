@@ -29,7 +29,11 @@ public enum GlobalErrorTypes {
     CREDENTIAL_SERIALIZATION("credential_serialization"),
     CREDENTIAL_PROCEDURE_INVALID_STATUS("credential_procedure_invalid_status"),
     CREDENTIAL_PROCEDURE_NOT_FOUND("credential_procedure_not_found"),
-    INVALID_CREDENTIAL_FORMAT("invalid_credential_format");
+    INVALID_CREDENTIAL_FORMAT("invalid_credential_format"),
+    PROCEDURE_RETRY_RECORD_NOT_FOUND("procedure_retry_record_not_found"),
+    INVALID_RETRY_STATUS("invalid_retry_status"),
+    RETRY_PAYLOAD_ERROR("retry_payload_error"),
+    RETRY_CONFIGURATION_ERROR("retry_configuration_error");
 
     private final String code;
 

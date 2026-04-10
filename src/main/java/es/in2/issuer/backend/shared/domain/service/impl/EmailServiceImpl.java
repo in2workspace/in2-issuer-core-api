@@ -26,6 +26,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE;
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.UTF_8;
@@ -34,6 +35,8 @@ import static es.in2.issuer.backend.backoffice.domain.util.Constants.UTF_8;
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
+    private static final String PRODUCT_ID = "productId";
+
     private final JavaMailSender javaMailSender;
     private final TemplateEngine templateEngine;
     private final MailProperties mailProperties;
@@ -117,6 +120,7 @@ public class EmailServiceImpl implements EmailService {
             return null;
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
+
     @Override
     public Mono<Void> sendPendingSignatureCredentialNotification(String to, String subject, String id, String domain){
         return Mono.fromCallable(() -> {
@@ -136,11 +140,12 @@ public class EmailServiceImpl implements EmailService {
             return null;
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
+
     @Override
     public Mono<Void> sendCredentialSignedNotification(String to, String subject, String additionalInfo) {
         return Mono.fromCallable(() -> {
             MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8);
             helper.setFrom(mailProperties.getUsername());
             helper.setTo(to);
             helper.setSubject(translationService.translate(subject));
@@ -157,22 +162,38 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public Mono<Void> sendResponseUriFailed(String to, String productId, String guideUrl) {
-        return Mono.fromCallable(() -> {
-            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8);
-            helper.setFrom(mailProperties.getUsername());
-            helper.setTo(to);
-            helper.setSubject(translationService.translate("email.unsuccessful-submission"));
+        return sendTemplatedEmail(
+                to,
+                "email.unsuccessful-submission",
+                "response-uri-failed",
+                context -> {
+                    context.setVariable(PRODUCT_ID, productId);
+                    context.setVariable("guideUrl", guideUrl);
+                }
+        );
+    }
 
-            Context context = new Context();
-            context.setVariable("productId", productId);
-            context.setVariable("guideUrl", guideUrl);
-            String htmlContent = templateEngine.process("response-uri-failed-" + translationService.getLocale(), context);
-            helper.setText(htmlContent, true);
+    @Override
+    public Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl) {
+        return sendTemplatedEmail(
+                to,
+                "email.retry-exhausted-submission",
+                "response-uri-exhausted",
+                context -> {
+                    context.setVariable(PRODUCT_ID, productId);
+                    context.setVariable("guideUrl", guideUrl);
+                }
+        );
+    }
 
-            javaMailSender.send(mimeMessage);
-            return null;
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+    @Override
+    public Mono<Void> sendCertificationUploaded(String to, String productId) {
+        return sendTemplatedEmail(
+                to,
+                "email.certification-uploaded",
+                "certification-uploaded",
+                context -> context.setVariable(PRODUCT_ID, productId)
+        );
     }
 
     @Override
@@ -259,6 +280,34 @@ public class EmailServiceImpl implements EmailService {
         context.setVariable("type", type);
         context.setVariable("credentialStatus", credentialStatus);
         return context;
+    }
+
+    private Mono<Void> sendTemplatedEmail(
+            String to,
+            String subjectKey,
+            String templateName,
+            Consumer<Context> contextCustomizer
+    ) {
+        return Mono.fromCallable(() -> {
+            try {
+                MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8);
+                helper.setFrom(mailProperties.getUsername());
+                helper.setTo(to);
+                helper.setSubject(translationService.translate(subjectKey));
+
+                Context context = new Context();
+                contextCustomizer.accept(context);
+
+                String htmlContent = templateEngine.process(templateName + "-" + translationService.getLocale(), context);
+                helper.setText(htmlContent, true);
+
+                javaMailSender.send(mimeMessage);
+                return null;
+            } catch (MessagingException e) {
+                throw new EmailCommunicationException(MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE);
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
 }

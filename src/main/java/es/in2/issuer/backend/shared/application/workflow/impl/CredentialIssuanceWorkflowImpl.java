@@ -1,13 +1,16 @@
 package es.in2.issuer.backend.shared.application.workflow.impl;
 
 import com.nimbusds.jose.JWSObject;
+import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
 import es.in2.issuer.backend.oidc4vci.domain.model.CredentialIssuerMetadata;
 import es.in2.issuer.backend.shared.application.workflow.CredentialIssuanceWorkflow;
 import es.in2.issuer.backend.shared.domain.exception.*;
 import es.in2.issuer.backend.shared.domain.model.dto.*;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.employee.LEARCredentialEmployee;
+import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
 import es.in2.issuer.backend.shared.domain.model.entities.CredentialProcedure;
 import es.in2.issuer.backend.shared.domain.model.entities.DeferredCredentialMetadata;
+import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialType;
 import es.in2.issuer.backend.shared.domain.service.*;
 import es.in2.issuer.backend.shared.domain.util.JwtUtils;
@@ -19,6 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
 
 import javax.naming.ConfigurationException;
 import javax.naming.OperationNotSupportedException;
@@ -45,8 +50,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
     private final TrustFrameworkService trustFrameworkService;
     private final LEARCredentialEmployeeFactory credentialEmployeeFactory;
     private final CredentialIssuerMetadataService credentialIssuerMetadataService;
-    private final M2MTokenService m2mTokenService;
-    private final CredentialDeliveryService credentialDeliveryService;
+    private final ProcedureRetryService procedureRetryService;
     private final JwtUtils jwtUtils;
 
     @Override
@@ -386,21 +390,23 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                         return Mono.error(new IllegalStateException("Encoded credential not found for procedureId: " + updatedCredentialProcedure.getProcedureId()));
                                     }
 
-
                                     return credentialProcedureService.getCredentialId(credentialProcedure)
-                                            .doOnNext(credentialId -> log.debug("Using credentialId for delivery: {}", credentialId))
-                                            .flatMap(credentialId ->
-                                                    m2mTokenService.getM2MToken()
-                                                            .flatMap(tokenResponse ->
-                                                                    credentialDeliveryService.sendVcToResponseUri(
-                                                                            deferred.getResponseUri(),
-                                                                            encodedCredential,
-                                                                            credentialId,
-                                                                            credentialProcedure.getEmail(),
-                                                                            tokenResponse.accessToken()
-                                                                    )
-                                                            )
-                                            );
+                                            .flatMap(credentialId -> {
+                                                LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
+                                                        .responseUri(deferred.getResponseUri())
+                                                        .signedCredential(encodedCredential)
+                                                        .credentialId(credentialId)
+                                                        .companyEmail(credentialProcedure.getEmail())
+                                                        .build();
+                                                
+                                                // Execute delivery as fire-and-forget (completely parallel)
+                                                procedureRetryService.handleInitialAction(updatedCredentialProcedure.getProcedureId(), ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
+                                                        .subscribeOn(Schedulers.boundedElastic())
+                                                        .subscribe();
+                                                
+                                                // Main flow continues immediately without waiting for upload
+                                                return Mono.empty();
+                                            });
                                 }
 
                                 return Mono.empty();

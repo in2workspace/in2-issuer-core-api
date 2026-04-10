@@ -27,6 +27,9 @@ import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFa
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialMachineFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LabelCredentialFactory;
 import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedureRepository;
+import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
+import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
+import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.minvws.encoding.Base45;
@@ -65,6 +68,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
     private final CredentialDeliveryService credentialDeliveryService;
     private final DeferredCredentialMetadataService deferredCredentialMetadataService;
     private final IssuerFactory issuerFactory;
+    private final ProcedureRetryService procedureRetryService;
 
 
     @Override
@@ -351,16 +355,13 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                                             log.debug("Using credentialId for delivery: {}", credentialId)
                                                                                     )
                                                                                     .flatMap(credentialId ->
-                                                                                            m2mTokenService.getM2MToken()
-                                                                                                    .flatMap(m2mToken ->
-                                                                                                            credentialDeliveryService.sendVcToResponseUri(
-                                                                                                                    responseUri,
-                                                                                                                    signedVc,
-                                                                                                                    credentialId,
-                                                                                                                    companyEmail,
-                                                                                                                    m2mToken.accessToken()
-                                                                                                            )
-                                                                                                    )
+                                                                                            deliverLabelCredentialWithRetry(
+                                                                                                    responseUri,
+                                                                                                    signedVc,
+                                                                                                    credentialId,
+                                                                                                    companyEmail,
+                                                                                                    UUID.fromString(procedureId)
+                                                                                            )
                                                                                     );
                                                                         } catch (Exception e) {
                                                                             log.error("Error preparing signed VC for delivery", e);
@@ -383,5 +384,31 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                 bindCredential,
                 JWT_VC
         );
+    }
+
+    /**
+     * Delivers label credential to response URI with retry mechanism.
+     * If initial retries fail, creates a retry record for scheduler-based recovery.
+     */
+    private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
+                                                       String credentialId, String companyEmail, 
+                                                       UUID procedureId) {
+        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
+            procedureId, responseUri, credentialId, companyEmail);
+
+        LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
+            .responseUri(responseUri)
+            .signedCredential(signedVc)
+            .credentialId(credentialId)
+            .companyEmail(companyEmail)
+            .build();
+
+        // Execute delivery as fire-and-forget (completely parallel)
+        procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe();
+        
+        // Main flow continues immediately without waiting for upload
+        return Mono.empty();
     }
 }

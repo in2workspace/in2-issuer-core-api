@@ -132,6 +132,48 @@ class EmailServiceImplTest {
     }
 
     @Test
+    void sendResponseUriExhausted_sendsEmailSuccessfully(){
+        MimeMessage mimeMessage = mock(MimeMessage.class);
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("response-uri-exhausted-en"), any(Context.class))).thenReturn("htmlContent");
+
+        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productId", "guideUrl"))
+                .verifyComplete();
+
+        verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
+    void sendResponseUriExhausted_handlesException(){
+        when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
+
+        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productId", "guideUrl"))
+                .expectError(RuntimeException.class) // service does not map this one
+                .verify();
+    }
+
+    @Test
+    void sendCertificationUploaded_sendsEmailSuccessfully(){
+        MimeMessage mimeMessage = mock(MimeMessage.class);
+        when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("certification-uploaded-en"), any(Context.class))).thenReturn("htmlContent");
+
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+                .verifyComplete();
+
+        verify(javaMailSender).send(mimeMessage);
+    }
+
+    @Test
+    void sendCertificationUploaded_handlesException(){
+        when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
+
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+                .expectError(RuntimeException.class) // service does not map this one
+                .verify();
+    }
+
+    @Test
     void sendResponseUriAcceptedWithHtml_sendsEmailSuccessfully() {
         MimeMessage mimeMessage = mock(MimeMessage.class);
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);

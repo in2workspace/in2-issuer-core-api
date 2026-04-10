@@ -742,5 +742,116 @@ class GlobalExceptionHandlerTest {
         verify(errors).handleWith(ex, request, type, title, st, fallback);
     }
 
+    // -------------------- handleProcedureRetryRecordNotFoundException --------------------
+
+    @Test
+    void handleProcedureRetryRecordNotFoundException() {
+        var ex = new ProcedureRetryRecordNotFoundException("retry record not found");
+        var type = GlobalErrorTypes.PROCEDURE_RETRY_RECORD_NOT_FOUND.getCode();
+        var title = "Retry record not found";
+        var st = HttpStatus.NOT_FOUND;
+        var fallback = "The requested retry record was not found";
+
+        var expected = new GlobalErrorMessage(
+                type,
+                title,
+                st.value(),
+                "retry record not found",
+                UUID.randomUUID().toString()
+        );
+
+        when(errors.handleWith(ex, request, type, title, st, fallback))
+                .thenReturn(Mono.just(expected));
+
+        StepVerifier.create(handler.handleProcedureRetryRecordNotFoundException(ex, request))
+                .assertNext(gem -> assertGem(gem, type, title, st, "retry record not found"))
+                .verifyComplete();
+
+        verify(errors).handleWith(ex, request, type, title, st, fallback);
+    }
+
+    // -------------------- handleInvalidRetryStatusException --------------------
+
+    @Test
+    void handleInvalidRetryStatusException() {
+        var ex = new InvalidRetryStatusException("retry status is not pending");
+        var type = GlobalErrorTypes.INVALID_RETRY_STATUS.getCode();
+        var title = "Invalid retry status";
+        var st = HttpStatus.CONFLICT;
+        var fallback = "The retry record is not in a valid status for this operation";
+
+        var expected = new GlobalErrorMessage(
+                type,
+                title,
+                st.value(),
+                "retry status is not pending",
+                UUID.randomUUID().toString()
+        );
+
+        when(errors.handleWith(ex, request, type, title, st, fallback))
+                .thenReturn(Mono.just(expected));
+
+        StepVerifier.create(handler.handleInvalidRetryStatusException(ex, request))
+                .assertNext(gem -> assertGem(gem, type, title, st, "retry status is not pending"))
+                .verifyComplete();
+
+        verify(errors).handleWith(ex, request, type, title, st, fallback);
+    }
+
+    // -------------------- handleRetryPayloadException --------------------
+
+    @Test
+    void handleRetryPayloadException() {
+        var ex = new RetryPayloadException("failed to serialize payload");
+        var type = GlobalErrorTypes.RETRY_PAYLOAD_ERROR.getCode();
+        var title = "Retry payload error";
+        var st = HttpStatus.INTERNAL_SERVER_ERROR;
+        var fallback = "An error occurred while serializing or deserializing retry payload";
+
+        var expected = new GlobalErrorMessage(
+                type,
+                title,
+                st.value(),
+                "failed to serialize payload",
+                UUID.randomUUID().toString()
+        );
+
+        when(errors.handleWith(ex, request, type, title, st, fallback))
+                .thenReturn(Mono.just(expected));
+
+        StepVerifier.create(handler.handleRetryPayloadException(ex, request))
+                .assertNext(gem -> assertGem(gem, type, title, st, "failed to serialize payload"))
+                .verifyComplete();
+
+        verify(errors).handleWith(ex, request, type, title, st, fallback);
+    }
+
+    // -------------------- handleRetryConfigurationException --------------------
+
+    @Test
+    void handleRetryConfigurationException() {
+        var ex = new RetryConfigurationException("invalid retry configuration");
+        var type = GlobalErrorTypes.RETRY_CONFIGURATION_ERROR.getCode();
+        var title = "Retry configuration error";
+        var st = HttpStatus.INTERNAL_SERVER_ERROR;
+        var fallback = "An error occurred in the retry mechanism configuration";
+
+        var expected = new GlobalErrorMessage(
+                type,
+                title,
+                st.value(),
+                "invalid retry configuration",
+                UUID.randomUUID().toString()
+        );
+
+        when(errors.handleWith(ex, request, type, title, st, fallback))
+                .thenReturn(Mono.just(expected));
+
+        StepVerifier.create(handler.handleRetryConfigurationException(ex, request))
+                .assertNext(gem -> assertGem(gem, type, title, st, "invalid retry configuration"))
+                .verifyComplete();
+
+        verify(errors).handleWith(ex, request, type, title, st, fallback);
+    }
 
 }

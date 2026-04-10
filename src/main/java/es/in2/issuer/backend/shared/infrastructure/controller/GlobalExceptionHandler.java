@@ -417,4 +417,64 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ProcedureRetryRecordNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Mono<GlobalErrorMessage> handleProcedureRetryRecordNotFoundException(
+            ProcedureRetryRecordNotFoundException ex,
+            ServerHttpRequest request
+    ) {
+        return errors.handleWith(
+                ex, request,
+                GlobalErrorTypes.PROCEDURE_RETRY_RECORD_NOT_FOUND.getCode(),
+                "Retry record not found",
+                HttpStatus.NOT_FOUND,
+                "The requested retry record was not found"
+        );
+    }
+
+    @ExceptionHandler(InvalidRetryStatusException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Mono<GlobalErrorMessage> handleInvalidRetryStatusException(
+            InvalidRetryStatusException ex,
+            ServerHttpRequest request
+    ) {
+        return errors.handleWith(
+                ex, request,
+                GlobalErrorTypes.INVALID_RETRY_STATUS.getCode(),
+                "Invalid retry status",
+                HttpStatus.CONFLICT,
+                "The retry record is not in a valid status for this operation"
+        );
+    }
+
+    @ExceptionHandler(RetryPayloadException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Mono<GlobalErrorMessage> handleRetryPayloadException(
+            RetryPayloadException ex,
+            ServerHttpRequest request
+    ) {
+        return errors.handleWith(
+                ex, request,
+                GlobalErrorTypes.RETRY_PAYLOAD_ERROR.getCode(),
+                "Retry payload error",
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An error occurred while serializing or deserializing retry payload"
+        );
+    }
+
+    @ExceptionHandler(RetryConfigurationException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Mono<GlobalErrorMessage> handleRetryConfigurationException(
+            RetryConfigurationException ex,
+            ServerHttpRequest request
+    ) {
+        return errors.handleWith(
+                ex, request,
+                GlobalErrorTypes.RETRY_CONFIGURATION_ERROR.getCode(),
+                "Retry configuration error",
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "An error occurred in the retry mechanism configuration"
+        );
+    }
+
 }
