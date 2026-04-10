@@ -321,7 +321,6 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     private Mono<Void> updateRetryAfterScheduledFailure(ProcedureRetry retryRecord) {
-        log.info("updateRetryAfterScheduledFailure: {}", retryRecord);
         return procedureRetryRepository.incrementAttemptCount(
                         retryRecord.getProcedureId(),
                         retryRecord.getActionType(),
