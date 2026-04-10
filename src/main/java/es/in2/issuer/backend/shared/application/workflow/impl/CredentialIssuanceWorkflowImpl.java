@@ -401,15 +401,6 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                                 
                                                 // Execute delivery as fire-and-forget (completely parallel)
                                                 procedureRetryService.handleInitialAction(updatedCredentialProcedure.getProcedureId(), ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-                                                        .doOnSuccess(unused -> log.info("[{}] SUCCESS: Label credential delivered to response URI for procedureId={}", 
-                                                            processId, updatedCredentialProcedure.getProcedureId()))
-                                                        .doOnError(e -> log.error("[{}] ERROR: Label delivery failed for procedureId={} - {}", 
-                                                            processId, updatedCredentialProcedure.getProcedureId(), e.getMessage(), e))
-                                                        .onErrorResume(e -> {
-                                                            log.warn("[{}] Label delivery failed for procedureId={}, retry record created by service. Reason: {}", 
-                                                                processId, updatedCredentialProcedure.getProcedureId(), e.getMessage(), e);
-                                                            return Mono.empty();
-                                                        })
                                                         .subscribeOn(Schedulers.boundedElastic())
                                                         .subscribe();
                                                 
