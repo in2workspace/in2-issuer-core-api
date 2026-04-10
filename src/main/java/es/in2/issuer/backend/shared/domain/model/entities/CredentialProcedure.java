@@ -8,6 +8,7 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -17,7 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @ToString
 @Table("issuer.credential_procedure")
-public class CredentialProcedure extends AuditableEntity{
+public class CredentialProcedure {
     @Id
     @Column("procedure_id")
     private UUID procedureId;
@@ -59,4 +60,22 @@ public class CredentialProcedure extends AuditableEntity{
     @Column("notification_id")
     private UUID notificationId;
 
+
+    // --- Auditing fields (R2DBC auditing will fill these) ---
+    @CreatedDate
+    @Column("created_at")
+    private Instant createdAt;
+
+    @LastModifiedDate
+    @Column("updated_at")
+    private Instant updatedAt;
+
+    @CreatedBy
+    @Column("created_by")
+    private String createdBy;
+
+    @LastModifiedBy
+    @Column("updated_by")
+    private String updatedBy;
+    // --------------------------------------------------------
 }

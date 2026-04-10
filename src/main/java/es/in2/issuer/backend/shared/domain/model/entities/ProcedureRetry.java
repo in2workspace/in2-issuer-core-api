@@ -17,7 +17,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @ToString
 @Table("issuer.procedure_retry")
-public class ProcedureRetry extends AuditableEntity{
+public class ProcedureRetry {
 
     @Id
     @Column("id")
@@ -43,5 +43,4 @@ public class ProcedureRetry extends AuditableEntity{
 
     @Column("payload")
     private String payload;
-
 }
