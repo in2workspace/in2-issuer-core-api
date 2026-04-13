@@ -45,12 +45,16 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // Retry configuration constants
     private static final int INITIAL_RETRY_ATTEMPTS = 3;
     private static final Duration[] INITIAL_RETRY_DELAYS = {
-          Duration.ofMinutes(2),
-          Duration.ofMinutes(5),
-          Duration.ofMinutes(15)
+//        todo restore  Duration.ofMinutes(2),
+//          Duration.ofMinutes(5),
+//          Duration.ofMinutes(15)
+            Duration.ofSeconds(8),
+          Duration.ofSeconds(15),
+          Duration.ofSeconds(20)
     };
 
-    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
+//  todo restore  private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
+    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofMinutes(3);
 
     // ──────────────────────────────────────────────────────────────────────
     // A. Initial Issuance Orchestration

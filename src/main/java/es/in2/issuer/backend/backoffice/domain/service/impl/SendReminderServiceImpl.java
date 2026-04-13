@@ -57,6 +57,7 @@ public class SendReminderServiceImpl implements SendReminderService {
                                     )
                                     .onErrorMap(ex -> new EmailCommunicationException(MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE));
 
+                        // ??
                         case PEND_DOWNLOAD ->
                             emailService.sendCredentialSignedNotification(
                                     credentialProcedure.getEmail(),
