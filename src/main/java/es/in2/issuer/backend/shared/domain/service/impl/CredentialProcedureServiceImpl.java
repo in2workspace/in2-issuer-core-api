@@ -403,4 +403,16 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
                         });
     }
 
+    @Override
+    public Mono<Void> updateCredentialStatusToPendSignature(String procedureId) {
+        return credentialProcedureRepository.findByProcedureId(UUID.fromString(procedureId))
+                .flatMap(credentialProcedure -> {
+                    log.debug("Updating credential status to PEND_SIGNATURE for procedureId: {}", procedureId);
+                    credentialProcedure.setCredentialStatus(CredentialStatusEnum.PEND_SIGNATURE);
+                    return credentialProcedureRepository.save(credentialProcedure)
+                            .doOnSuccess(result -> log.info(UPDATED_CREDENTIAL, "credentialProcedure: " + credentialProcedure))
+                            .then();
+                });
+    }
+
 }

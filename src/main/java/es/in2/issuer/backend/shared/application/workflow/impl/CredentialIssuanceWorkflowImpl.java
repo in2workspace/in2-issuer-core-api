@@ -4,6 +4,7 @@ import com.nimbusds.jose.JWSObject;
 import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
 import es.in2.issuer.backend.oidc4vci.domain.model.CredentialIssuerMetadata;
 import es.in2.issuer.backend.shared.application.workflow.CredentialIssuanceWorkflow;
+import es.in2.issuer.backend.shared.application.workflow.CredentialSignerWorkflow;
 import es.in2.issuer.backend.shared.domain.exception.*;
 import es.in2.issuer.backend.shared.domain.model.dto.*;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.employee.LEARCredentialEmployee;
@@ -11,9 +12,12 @@ import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDelive
 import es.in2.issuer.backend.shared.domain.model.entities.CredentialProcedure;
 import es.in2.issuer.backend.shared.domain.model.entities.DeferredCredentialMetadata;
 import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.shared.domain.model.enums.CredentialStatusEnum;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialType;
 import es.in2.issuer.backend.shared.domain.service.*;
 import es.in2.issuer.backend.shared.domain.util.JwtUtils;
+import es.in2.issuer.backend.shared.domain.util.factory.IssuerFactory;
+import es.in2.issuer.backend.shared.domain.util.factory.LabelCredentialFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFactory;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import es.in2.issuer.backend.shared.infrastructure.config.security.service.VerifiableCredentialPolicyAuthorizationService;
@@ -27,6 +31,7 @@ import reactor.core.scheduler.Schedulers;
 
 import javax.naming.ConfigurationException;
 import javax.naming.OperationNotSupportedException;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,6 +57,9 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
     private final CredentialIssuerMetadataService credentialIssuerMetadataService;
     private final ProcedureRetryService procedureRetryService;
     private final JwtUtils jwtUtils;
+    private final CredentialSignerWorkflow credentialSignerWorkflow;
+    private final IssuerFactory issuerFactory;
+    private final LabelCredentialFactory labelCredentialFactory;
 
     @Override
     public Mono<Void> execute(String processId, PreSubmittedCredentialDataRequest preSubmittedCredentialDataRequest, String token, String idToken) {
@@ -78,8 +86,108 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
         // Validate user policy before proceeding
         return verifiableCredentialPolicyAuthorizationService.authorize(token, preSubmittedCredentialDataRequest.schema(), preSubmittedCredentialDataRequest.payload(), idToken)
                 .then(verifiableCredentialService.generateVc(processId, preSubmittedCredentialDataRequest, emailInfo.email(), token)
-                        .flatMap(transactionCode -> sendCredentialOfferEmail(transactionCode, emailInfo))
+                        .flatMap(transactionCode -> {
+                            // For label credentials, sign immediately and trigger parallel delivery
+                            if (LABEL_CREDENTIAL.equals(preSubmittedCredentialDataRequest.schema())) {
+                                return handleLabelCredentialIssuance(processId, transactionCode, emailInfo, token);
+                            }
+                            // For other credential types, just send the credential offer email
+                            return sendCredentialOfferEmail(transactionCode, emailInfo);
+                        })
                 );
+    }
+
+    private Mono<Void> handleLabelCredentialIssuance(
+            String processId,
+            String transactionCode,
+            CredentialOfferEmailNotificationInfo emailInfo,
+            String token
+    ) {
+        return deferredCredentialMetadataService.getProcedureIdByTransactionCode(transactionCode)
+                .flatMap(procedureId ->
+                        // Step 1: Bind issuer to the credential
+                        issuerFactory.createSimpleIssuerAndNotifyOnError(procedureId, emailInfo.email())
+                                .flatMap(issuer -> labelCredentialFactory.mapIssuer(procedureId, issuer))
+                                .flatMap(boundCredential ->
+                                        credentialProcedureService.updateDecodedCredentialByProcedureId(procedureId, boundCredential)
+                                                .thenReturn(procedureId)
+                                )
+                                // Step 2: Sign the credential
+                                .flatMap(procId -> credentialSignerWorkflow.signAndUpdateCredentialByProcedureId(token, procId, JWT_VC)
+                                        .flatMap(signedCredential ->
+                                                // Step 3: Update status to VALID
+                                                credentialProcedureService.updateCredentialProcedureCredentialStatusToValidByProcedureId(procId)
+                                                        .then(credentialProcedureService.getCredentialProcedureById(procId))
+                                                        .flatMap(credentialProcedure ->
+                                                                // Step 4: Trigger parallel delivery (email + response URI)
+                                                                triggerLabelCredentialParallelDelivery(
+                                                                        procId,
+                                                                        transactionCode,
+                                                                        signedCredential,
+                                                                        emailInfo,
+                                                                        credentialProcedure
+                                                                )
+                                                        )
+                                        )
+                                        .onErrorResume(signingError -> {
+                                            log.error("ProcessID: {} - Label credential signing failed: {}", processId, signingError.getMessage());
+                                            // Update status to PEND_SIGNATURE and propagate error
+                                            return credentialProcedureService.updateCredentialStatusToPendSignature(procId)
+                                                    .then(Mono.error(new RemoteSignatureException(
+                                                            "Label credential signing failed. Credential saved with PEND_SIGNATURE status for later retry."
+                                                    )));
+                                        })
+                                )
+                );
+    }
+
+    private Mono<Void> triggerLabelCredentialParallelDelivery(
+            String procedureId,
+            String transactionCode,
+            String signedCredential,
+            CredentialOfferEmailNotificationInfo emailInfo,
+            CredentialProcedure credentialProcedure
+    ) {
+        // Fire-and-forget: Send credential offer email
+        String credentialOfferUrl = buildCredentialOfferUrl(transactionCode);
+        emailService.sendCredentialActivationEmail(
+                        emailInfo.email(),
+                        CREDENTIAL_ACTIVATION_EMAIL_SUBJECT,
+                        credentialOfferUrl,
+                        appConfig.getKnowledgebaseWalletUrl(),
+                        emailInfo.organization()
+                )
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(
+                        unused -> log.info("Label credential offer email sent for procedureId: {}", procedureId),
+                        error -> log.error("Failed to send label credential offer email for procedureId: {}: {}", procedureId, error.getMessage())
+                );
+
+        // Fire-and-forget: Send to response URI with retry mechanism
+        return deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId)
+                .flatMap(responseUri ->
+                        credentialProcedureService.getCredentialId(credentialProcedure)
+                                .flatMap(credentialId -> {
+                                    LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
+                                            .responseUri(responseUri)
+                                            .signedCredential(signedCredential)
+                                            .credentialId(credentialId)
+                                            .companyEmail(credentialProcedure.getEmail())
+                                            .build();
+
+                                    // Execute delivery as fire-and-forget
+                                    procedureRetryService.handleInitialAction(
+                                                    UUID.fromString(procedureId),
+                                                    ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
+                                                    payload
+                                            )
+                                            .subscribeOn(Schedulers.boundedElastic())
+                                            .subscribe();
+
+                                    return Mono.empty();
+                                })
+                )
+                .then();
     }
 
     private Mono<Void> sendCredentialOfferEmail(
@@ -154,11 +262,40 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
         final String procedureId = accessTokenContext.procedureId();
 
         return credentialProcedureService.getCredentialProcedureById(procedureId)
-                .zipWhen(proc -> credentialIssuerMetadataService.getCredentialIssuerMetadata(processId))
-                .flatMap(tuple -> {
-                    CredentialProcedure proc = tuple.getT1();
-                    CredentialIssuerMetadata md = tuple.getT2();
+                .flatMap(proc -> {
+                    // For label credentials that are already signed (VALID status), return stored credential directly
+                    if (LABEL_CREDENTIAL_TYPE.equals(proc.getCredentialType())
+                            && proc.getCredentialStatus() == CredentialStatusEnum.VALID
+                            && proc.getCredentialEncoded() != null
+                            && !proc.getCredentialEncoded().isBlank()) {
+                        log.info("[{}] Label credential already signed, returning stored credential for procedureId={}",
+                                processId, procedureId);
+                        return credentialProcedureService.getNotificationIdByProcedureId(procedureId)
+                                .map(notificationId -> CredentialResponse.builder()
+                                        .credentials(List.of(
+                                                CredentialResponse.Credential.builder()
+                                                        .credential(proc.getCredentialEncoded())
+                                                        .build()
+                                        ))
+                                        .notificationId(notificationId)
+                                        .build());
+                    }
+                    // Otherwise, proceed with normal flow
+                    return proceedWithCredentialIssuance(processId, credentialRequest, accessTokenContext, proc);
+                });
+    }
 
+    private Mono<CredentialResponse> proceedWithCredentialIssuance(
+            String processId,
+            CredentialRequest credentialRequest,
+            AccessTokenContext accessTokenContext,
+            CredentialProcedure proc
+    ) {
+        final String nonce = accessTokenContext.jti();
+        final String procedureId = accessTokenContext.procedureId();
+
+        return credentialIssuerMetadataService.getCredentialIssuerMetadata(processId)
+                .flatMap(md -> {
                     String email = proc.getEmail();
 
                     boolean responseUriPresent = accessTokenContext.responseUri() != null && !accessTokenContext.responseUri().isBlank();

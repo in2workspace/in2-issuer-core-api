@@ -27,4 +27,5 @@ public interface DeferredCredentialMetadataService {
     Mono<Void> deleteDeferredCredentialMetadataByAuthServerNonce(String authServerNonce);
     Mono<Void> updateFormatByProcedureId(String procedureId, String format);
     Mono<String> getFormatByProcedureId(String procedureId);
+    Mono<String> getTransactionCodeByProcedureId(String procedureId);
 }

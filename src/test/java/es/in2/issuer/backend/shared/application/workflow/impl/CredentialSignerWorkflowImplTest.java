@@ -92,6 +92,9 @@ class CredentialSignerWorkflowImplTest {
     @Mock
     private AppConfig appConfig;
 
+    @Mock
+    private EmailService emailService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -242,6 +245,7 @@ class CredentialSignerWorkflowImplTest {
 
         CredentialProcedure updatedProcedure = mock(CredentialProcedure.class);
         when(updatedProcedure.getCredentialType()).thenReturn(LABEL_CREDENTIAL_TYPE);
+        when(updatedProcedure.getEmail()).thenReturn(email);
 
         when(accessTokenService.getCleanBearerToken(authorizationHeader))
                 .thenReturn(Mono.just(token));
@@ -267,6 +271,15 @@ class CredentialSignerWorkflowImplTest {
                 .thenReturn(Mono.empty());
         when(credentialProcedureRepository.save(any()))
                 .thenReturn(Mono.just(updatedProcedure));
+
+        // Mock email sending (fire-and-forget) - use lenient since async may not complete during test
+        lenient().when(deferredCredentialMetadataService.getTransactionCodeByProcedureId(procedureId))
+                .thenReturn(Mono.just("trans-code"));
+        lenient().when(appConfig.getIssuerFrontendUrl()).thenReturn("https://issuer.example.com");
+        lenient().when(appConfig.getKnowledgebaseWalletUrl()).thenReturn("https://wallet.example.com");
+        lenient().when(appConfig.getSysTenant()).thenReturn("sys-tenant");
+        lenient().when(emailService.sendCredentialActivationEmail(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Mono.empty());
 
         when(deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId))
                 .thenReturn(Mono.empty());
@@ -764,6 +777,15 @@ class CredentialSignerWorkflowImplTest {
         when(credentialProcedureService.updateCredentialProcedureCredentialStatusToValidByProcedureId(procedureId))
                 .thenReturn(Mono.empty());
         when(credentialProcedureRepository.save(any())).thenReturn(Mono.just(updatedProcedure));
+
+        // Mock email sending (fire-and-forget) - use lenient since async may not complete during test
+        lenient().when(deferredCredentialMetadataService.getTransactionCodeByProcedureId(procedureId))
+                .thenReturn(Mono.just("trans-code"));
+        lenient().when(appConfig.getIssuerFrontendUrl()).thenReturn("https://issuer.example.com");
+        lenient().when(appConfig.getKnowledgebaseWalletUrl()).thenReturn("https://wallet.example.com");
+        lenient().when(appConfig.getSysTenant()).thenReturn("sys-tenant");
+        lenient().when(emailService.sendCredentialActivationEmail(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Mono.empty());
 
         when(deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId))
                 .thenReturn(Mono.just("https://response.example.com/callback"));

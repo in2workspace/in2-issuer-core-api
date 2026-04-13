@@ -30,12 +30,14 @@ import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedur
 import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
 import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
 import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nl.minvws.encoding.Base45;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -45,8 +47,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static es.in2.issuer.backend.backoffice.domain.util.Constants.CWT_VC;
-import static es.in2.issuer.backend.backoffice.domain.util.Constants.JWT_VC;
+import static es.in2.issuer.backend.backoffice.domain.util.Constants.*;
 import static es.in2.issuer.backend.shared.domain.util.Constants.*;
 
 @Service
@@ -69,6 +70,8 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
     private final DeferredCredentialMetadataService deferredCredentialMetadataService;
     private final IssuerFactory issuerFactory;
     private final ProcedureRetryService procedureRetryService;
+    private final EmailService emailService;
+    private final AppConfig appConfig;
 
 
     @Override
@@ -342,6 +345,9 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                 return Mono.empty(); // do not send message if it is not LABEL_CREDENTIAL_TYPE
                                                             }
 
+                                                            // Fire-and-forget: Send credential offer email
+                                                            sendCredentialOfferEmailAsync(procedureId, updatedCredentialProcedure.getEmail());
+
                                                             return deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId)
                                                                     .switchIfEmpty(Mono.error(new IllegalStateException(
                                                                             "Missing responseUri for procedureId: " + procedureId
@@ -375,6 +381,34 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                             });
                 })
                 .then();
+    }
+
+    private void sendCredentialOfferEmailAsync(String procedureId, String email) {
+        deferredCredentialMetadataService.getTransactionCodeByProcedureId(procedureId)
+                .flatMap(transactionCode -> {
+                    String credentialOfferUrl = buildCredentialOfferUrl(transactionCode);
+                    return emailService.sendCredentialActivationEmail(
+                            email,
+                            CREDENTIAL_ACTIVATION_EMAIL_SUBJECT,
+                            credentialOfferUrl,
+                            appConfig.getKnowledgebaseWalletUrl(),
+                            appConfig.getSysTenant()
+                    );
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe(
+                        unused -> log.info("Credential offer email sent for procedureId: {}", procedureId),
+                        error -> log.error("Failed to send credential offer email for procedureId: {}: {}", procedureId, error.getMessage())
+                );
+    }
+
+    private String buildCredentialOfferUrl(String transactionCode) {
+        return UriComponentsBuilder
+                .fromHttpUrl(appConfig.getIssuerFrontendUrl())
+                .path("/credential-offer")
+                .queryParam("transaction_code", transactionCode)
+                .build()
+                .toUriString();
     }
 
     private Mono<Void> updateDecodedCredentialByProcedureId(String procedureId, String bindCredential) {

@@ -233,4 +233,12 @@ public class DeferredCredentialMetadataServiceImpl implements DeferredCredential
         return deferredCredentialMetadataRepository.findByProcedureId(UUID.fromString(procedureId))
                 .map(DeferredCredentialMetadata::getVcFormat);
     }
+
+    @Override
+    public Mono<String> getTransactionCodeByProcedureId(String procedureId) {
+        log.debug("Getting transactionCode by procedureId: {}", procedureId);
+        return deferredCredentialMetadataRepository.findByProcedureId(UUID.fromString(procedureId))
+                .map(DeferredCredentialMetadata::getTransactionCode)
+                .doOnNext(transactionCode -> log.debug("Found transactionCode: {} for procedureId: {}", transactionCode, procedureId));
+    }
 }
