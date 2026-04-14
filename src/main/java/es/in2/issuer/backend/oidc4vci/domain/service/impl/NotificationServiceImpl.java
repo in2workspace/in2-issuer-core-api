@@ -18,6 +18,7 @@ import reactor.core.publisher.Mono;
 
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.*;
 import static es.in2.issuer.backend.shared.domain.model.dto.NotificationEvent.CREDENTIAL_DELETED;
+import static es.in2.issuer.backend.shared.domain.util.Constants.LABEL_CREDENTIAL_TYPE;
 import static es.in2.issuer.backend.shared.domain.util.Constants.VC;
 
 @Slf4j
@@ -105,6 +106,13 @@ public class NotificationServiceImpl implements NotificationService {
         if (event != NotificationEvent.CREDENTIAL_DELETED) {
             log.info("AUDIT notification_no_external_action processId={} credentialProcedureId={} notificationId={} event={} eventDescription={}",
                     processId, procedure.getProcedureId(), procedure.getNotificationId(), event, eventDescription
+            );
+            return Mono.empty();
+        }
+
+        if (LABEL_CREDENTIAL_TYPE.equals(procedure.getCredentialType())) {
+            log.info("AUDIT notification_skip_revocation_for_label processId={} credentialProcedureId={} notificationId={} event={} credentialType={}",
+                    processId, procedure.getProcedureId(), procedure.getNotificationId(), event, procedure.getCredentialType()
             );
             return Mono.empty();
         }
