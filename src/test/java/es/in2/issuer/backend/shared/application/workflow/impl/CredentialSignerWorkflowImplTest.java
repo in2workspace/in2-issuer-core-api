@@ -899,10 +899,6 @@ class CredentialSignerWorkflowImplTest {
         StepVerifier.create(credentialSignerWorkflow.retrySignUnsignedCredential(processId, authorizationHeader, procedureId))
                 .verifyComplete();
 
-        // Wait briefly for async operations
-        Thread.sleep(100);
-
-        // Verify email flow was executed
         verify(deferredCredentialMetadataService, timeout(1000)).getTransactionCodeByProcedureId(procedureId);
         verify(emailService, timeout(1000)).sendCredentialActivationEmail(
                 eq("company@example.com"),

@@ -258,7 +258,6 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
             AccessTokenContext accessTokenContext
     ) {
 
-        final String nonce = accessTokenContext.jti();
         final String procedureId = accessTokenContext.procedureId();
 
         return credentialProcedureService.getCredentialProcedureById(procedureId)
