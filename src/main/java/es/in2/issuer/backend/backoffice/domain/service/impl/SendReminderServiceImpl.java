@@ -46,35 +46,13 @@ public class SendReminderServiceImpl implements SendReminderService {
                     return switch (credentialProcedure.getCredentialStatus()) {
                         case VALID -> {
                             if (LABEL_CREDENTIAL_TYPE.equals(credentialType)) {
-                                yield deferredCredentialMetadataService
-                                        .updateTransactionCodeInDeferredCredentialMetadata(procedureId)
-                                        .flatMap(newTransactionCode ->
-                                                emailService.sendCredentialActivationEmail(
-                                                        emailInfo.email(),
-                                                        CREDENTIAL_ACTIVATION_EMAIL_SUBJECT,
-                                                        appConfig.getIssuerFrontendUrl() + "/credential-offer?transaction_code=" + newTransactionCode,
-                                                        appConfig.getKnowledgebaseWalletUrl(),
-                                                        emailInfo.organization()
-                                                )
-                                        )
-                                        .onErrorMap(ex -> new EmailCommunicationException(MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE));
+                                yield updateMetadataAndSendActivationEmail(procedureId, emailInfo.email(), emailInfo.organization());
                             }
                             yield Mono.empty();
                         }
                         // TODO we need to remove the withdraw status from the condition since the v1.2.0 version is deprecated but in order to support retro compatibility issues we will keep it for now.
                         case DRAFT, WITHDRAWN ->
-                            deferredCredentialMetadataService
-                                    .updateTransactionCodeInDeferredCredentialMetadata(procedureId)
-                                    .flatMap(newTransactionCode ->
-                                            emailService.sendCredentialActivationEmail(
-                                                    emailInfo.email(),
-                                                    CREDENTIAL_ACTIVATION_EMAIL_SUBJECT,
-                                                    appConfig.getIssuerFrontendUrl() + "/credential-offer?transaction_code=" + newTransactionCode,
-                                                    appConfig.getKnowledgebaseWalletUrl(),
-                                                    emailInfo.organization()
-                                            )
-                                    )
-                                    .onErrorMap(ex -> new EmailCommunicationException(MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE));
+                            updateMetadataAndSendActivationEmail(procedureId, emailInfo.email(), emailInfo.organization());
 
                         // ??
                         case PEND_DOWNLOAD ->
@@ -88,5 +66,20 @@ public class SendReminderServiceImpl implements SendReminderService {
                     };
                 })
                 .then();
+    }
+
+    private Mono<Void> updateMetadataAndSendActivationEmail(String procedureId, String email, String organization) {
+        return deferredCredentialMetadataService
+                .updateTransactionCodeInDeferredCredentialMetadata(procedureId)
+                .flatMap(newTransactionCode ->
+                        emailService.sendCredentialActivationEmail(
+                                email,
+                                CREDENTIAL_ACTIVATION_EMAIL_SUBJECT,
+                                appConfig.getIssuerFrontendUrl() + "/credential-offer?transaction_code=" + newTransactionCode,
+                                appConfig.getKnowledgebaseWalletUrl(),
+                                organization
+                        )
+                )
+                .onErrorMap(ex -> new EmailCommunicationException(MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE));
     }
 }
