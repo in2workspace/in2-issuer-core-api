@@ -37,17 +37,15 @@ public interface ProcedureRetryRepository extends ReactiveCrudRepository<Procedu
      */
     @Modifying
     @Query("""
-            INSERT INTO issuer.procedure_retry 
-                (id, procedure_id, action_type, status, attempt_count, first_failure_at, payload, created_at, updated_at) 
-            VALUES 
-                (:#{#retry.id}, :#{#retry.procedureId}, :#{#retry.actionType}, :#{#retry.status}, 
-                 :#{#retry.attemptCount}, :#{#retry.firstFailureAt}, :#{#retry.payload}, 
-                 NOW(), NOW())
-            ON CONFLICT (procedure_id, action_type) 
-            DO UPDATE SET 
+            INSERT INTO issuer.procedure_retry
+                (id, procedure_id, action_type, status, attempt_count, first_failure_at, payload)
+            VALUES
+                (:#{#retry.id}, :#{#retry.procedureId}, :#{#retry.actionType}, :#{#retry.status},
+                 :#{#retry.attemptCount}, :#{#retry.firstFailureAt}, :#{#retry.payload})
+            ON CONFLICT (procedure_id, action_type)
+            DO UPDATE SET
                 status = EXCLUDED.status,
-                payload = EXCLUDED.payload,
-                updated_at = NOW()
+                payload = EXCLUDED.payload
             """)
     Mono<Integer> upsert(ProcedureRetry retry);
 
@@ -56,10 +54,9 @@ public interface ProcedureRetryRepository extends ReactiveCrudRepository<Procedu
      */
     @Modifying
     @Query("""
-            UPDATE issuer.procedure_retry 
-            SET attempt_count = attempt_count + 1, 
-                last_attempt_at = :lastAttemptAt,
-                updated_at = NOW()
+            UPDATE issuer.procedure_retry
+            SET attempt_count = attempt_count + 1,
+                last_attempt_at = :lastAttemptAt
             WHERE procedure_id = :procedureId AND action_type = :actionType
             """)
     Mono<Integer> incrementAttemptCount(UUID procedureId, ActionType actionType, Instant lastAttemptAt);
@@ -69,9 +66,8 @@ public interface ProcedureRetryRepository extends ReactiveCrudRepository<Procedu
      */
     @Modifying
     @Query("""
-            UPDATE issuer.procedure_retry 
-            SET status = 'COMPLETED',
-                updated_at = NOW()
+            UPDATE issuer.procedure_retry
+            SET status = 'COMPLETED'
             WHERE procedure_id = :procedureId AND action_type = :actionType
             """)
     Mono<Integer> markAsCompleted(UUID procedureId, ActionType actionType);
@@ -81,9 +77,8 @@ public interface ProcedureRetryRepository extends ReactiveCrudRepository<Procedu
      */
     @Modifying
     @Query("""
-            UPDATE issuer.procedure_retry 
-            SET status = 'RETRY_EXHAUSTED',
-                updated_at = NOW()
+            UPDATE issuer.procedure_retry
+            SET status = 'RETRY_EXHAUSTED'
             WHERE procedure_id = :procedureId AND action_type = :actionType
             """)
     Mono<Integer> markAsExhausted(UUID procedureId, ActionType actionType);
