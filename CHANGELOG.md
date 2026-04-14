@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.2.19](https://github.com/in2workspace/in2-issuer-api/releases/tag/v2.2.19)
+### Fixed
+- Removed `created_at` and `updated_at` usage from `ProcedureRetryRepository`, since these columns are not present in the corresponding DB table.
+- Avoid ambiguity in the message sent after successful uploading of the label credential to the response URI.
+
+## [v2.2.18](https://github.com/in2workspace/in2-issuer-api/releases/tag/v2.2.18)
+### Added
+- Add a retry/recovery mechanism for failed uploads to the response URI.
+
 ## [v2.2.17](https://github.com/in2workspace/in2-issuer-api/releases/tag/v2.2.17)
 ### Fixed
 - Set a public CORS configuration for oid4vci endpoints.
