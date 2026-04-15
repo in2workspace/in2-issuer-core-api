@@ -54,7 +54,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     };
 
 //  todo restore  private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
-    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofMinutes(3);
+    private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(3);
 
     // ──────────────────────────────────────────────────────────────────────
     // A. Initial Issuance Orchestration
