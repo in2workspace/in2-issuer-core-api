@@ -262,7 +262,6 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
 
         return credentialProcedureService.getCredentialProcedureById(procedureId)
                 .flatMap(proc -> {
-                    // For label credentials that are already signed (VALID status), return stored credential directly
                     if (LABEL_CREDENTIAL_TYPE.equals(proc.getCredentialType())
                             && proc.getCredentialStatus() == CredentialStatusEnum.VALID
                             && proc.getCredentialEncoded() != null
@@ -279,7 +278,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                         .notificationId(notificationId)
                                         .build());
                     }
-                    // Otherwise, proceed with normal flow
+
                     return proceedWithCredentialIssuance(processId, credentialRequest, accessTokenContext, proc);
                 });
     }

@@ -111,7 +111,7 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         if (LABEL_CREDENTIAL_TYPE.equals(procedure.getCredentialType())) {
-            log.info("AUDIT notification_skip_revocation_for_label processId={} credentialProcedureId={} notificationId={} event={} credentialType={}",
+            log.debug("AUDIT notification_skip_revocation_for_label processId={} credentialProcedureId={} notificationId={} event={} credentialType={}",
                     processId, procedure.getProcedureId(), procedure.getNotificationId(), event, procedure.getCredentialType()
             );
             return Mono.empty();
