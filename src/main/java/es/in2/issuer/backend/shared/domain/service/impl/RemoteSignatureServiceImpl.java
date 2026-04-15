@@ -103,21 +103,36 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
             String procedureId,
             String email
     ) {
-        log.debug(
-                "RemoteSignatureServiceImpl - signIssuedCredential, signatureRequest: {}, token: {}, procedureId: {}, email: {}",
-                signatureRequest, token, procedureId, email
-        );
+        log.info("╔════════════════════════════════════════════════════════════════╗");
+        log.info("║         SIGN ISSUED CREDENTIAL - START                         ║");
+        log.info("╚════════════════════════════════════════════════════════════════╝");
+        log.info("📋 [SIGN ISSUED] Procedure ID: {}", procedureId);
+        log.info("📋 [SIGN ISSUED] Email: {}", email);
+        log.info("📋 [SIGN ISSUED] Signature Type: {}", signatureRequest.configuration().type());
+        log.info("📋 [SIGN ISSUED] Data Length: {} chars", signatureRequest.data() != null ? signatureRequest.data().length() : 0);
+        log.debug("📋 [SIGN ISSUED] Token: {}", token);
+        log.debug("📋 [SIGN ISSUED] Full Request: {}", signatureRequest);
 
         return signWithRetry(signatureRequest, token, "signIssuedCredential")
                 .doOnSuccess(result -> {
-                    log.info("Successfully Signed");
-                    log.info("Procedure with id: {}", procedureId);
-                    log.info("at time: {}", new Date());
+                    log.info("╔════════════════════════════════════════════════════════════════╗");
+                    log.info("║         SIGN ISSUED CREDENTIAL - SUCCESS ✅                    ║");
+                    log.info("╚════════════════════════════════════════════════════════════════╝");
+                    log.info("📋 [SIGN ISSUED] Successfully Signed");
+                    log.info("📋 [SIGN ISSUED] Procedure with id: {}", procedureId);
+                    log.info("📋 [SIGN ISSUED] Timestamp: {}", new Date());
+                    log.info("📋 [SIGN ISSUED] Result Type: {}", result != null ? result.type() : "null");
+                    log.info("📋 [SIGN ISSUED] Deleting deferred credential metadata...");
                     deferredCredentialMetadataService.deleteDeferredCredentialMetadataById(procedureId);
                 })
                 .onErrorResume(throwable -> {
-                    log.error("Error after 3 retries, switching to ASYNC mode.");
-                    log.error("Error Time: {}", new Date());
+                    log.error("╔════════════════════════════════════════════════════════════════╗");
+                    log.error("║         SIGN ISSUED CREDENTIAL - FAILED ❌                     ║");
+                    log.error("╚════════════════════════════════════════════════════════════════╝");
+                    log.error("📋 [SIGN ISSUED] Error after 3 retries, switching to ASYNC mode.");
+                    log.error("📋 [SIGN ISSUED] Error Time: {}", new Date());
+                    log.error("📋 [SIGN ISSUED] Error Type: {}", throwable.getClass().getSimpleName());
+                    log.error("📋 [SIGN ISSUED] Error Message: {}", throwable.getMessage());
                     return handlePostRecoverError(procedureId, email)
                             .then(Mono.error(new RemoteSignatureException(
                                     "Signature Failed, changed to ASYNC mode",
@@ -153,12 +168,27 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
             SignatureRequest signatureRequest,
             String token
     ) {
-        log.debug(
-                "RemoteSignatureServiceImpl - signSystemCredential, signatureRequest: {}, token: {}",
-                signatureRequest, token
-        );
+        log.info("╔════════════════════════════════════════════════════════════════╗");
+        log.info("║         SIGN SYSTEM CREDENTIAL - START                         ║");
+        log.info("╚════════════════════════════════════════════════════════════════╝");
+        log.info("🔧 [SIGN SYSTEM] Signature Type: {}", signatureRequest.configuration().type());
+        log.info("🔧 [SIGN SYSTEM] Data Length: {} chars", signatureRequest.data() != null ? signatureRequest.data().length() : 0);
+        log.debug("🔧 [SIGN SYSTEM] Token: {}", token);
+        log.debug("🔧 [SIGN SYSTEM] Full Request: {}", signatureRequest);
 
-        return signWithRetry(signatureRequest, token, "signSystemCredential");
+        return signWithRetry(signatureRequest, token, "signSystemCredential")
+                .doOnSuccess(result -> {
+                    log.info("╔════════════════════════════════════════════════════════════════╗");
+                    log.info("║         SIGN SYSTEM CREDENTIAL - SUCCESS ✅                    ║");
+                    log.info("╚════════════════════════════════════════════════════════════════╝");
+                    log.info("🔧 [SIGN SYSTEM] Result Type: {}", result != null ? result.type() : "null");
+                })
+                .doOnError(error -> {
+                    log.error("╔════════════════════════════════════════════════════════════════╗");
+                    log.error("║         SIGN SYSTEM CREDENTIAL - FAILED ❌                     ║");
+                    log.error("╚════════════════════════════════════════════════════════════════╝");
+                    log.error("🔧 [SIGN SYSTEM] Error: {}", error.getMessage(), error);
+                });
     }
 
     private Mono<SignedData> signWithRetry(
@@ -166,14 +196,15 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
             String token,
             String operationName
     ) {
+        log.info("🔄 [RETRY WRAPPER] Starting {} with retry mechanism (max 3 attempts)", operationName);
+        
         return Mono.defer(() -> executeSigningFlow(signatureRequest, token))
                 .doOnSuccess(signedData -> {
                     int signedLength = (signedData != null && signedData.data() != null)
                             ? signedData.data().length()
                             : 0;
 
-                    log.info(
-                            "Remote signing succeeded ({}). resultType={}, signedLength={}",
+                    log.info("🔄 [RETRY WRAPPER] ✅ Remote signing succeeded ({}). resultType={}, signedLength={}",
                             operationName,
                             signedData != null ? signedData.type() : null,
                             signedLength
@@ -188,19 +219,22 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
                                     long attempt = retrySignal.totalRetries() + 1;
                                     Throwable failure = retrySignal.failure();
                                     String msg = failure != null ? failure.getMessage() : "n/a";
+                                    String errorType = failure != null ? failure.getClass().getSimpleName() : "Unknown";
 
-                                    log.warn(
-                                            "Retrying remote signing ({}). attempt={} of 3, reason={}",
-                                            operationName, attempt, msg
-                                    );
+                                    log.warn("🔄 [RETRY WRAPPER] ⚠️ Retrying remote signing ({}).", operationName);
+                                    log.warn("🔄 [RETRY WRAPPER] ⚠️ Attempt: {} of 3", attempt);
+                                    log.warn("🔄 [RETRY WRAPPER] ⚠️ Error Type: {}", errorType);
+                                    log.warn("🔄 [RETRY WRAPPER] ⚠️ Reason: {}", msg);
+                                    
+                                    if (failure instanceof WebClientResponseException webEx) {
+                                        log.warn("🔄 [RETRY WRAPPER] ⚠️ HTTP Status: {}", webEx.getStatusCode());
+                                    }
                                 })
                 )
-                .doOnError(ex ->
-                        log.error(
-                                "Remote signing failed after retries ({}). reason={}",
-                                operationName, ex.getMessage(), ex
-                        )
-                );
+                .doOnError(ex -> {
+                    log.error("🔄 [RETRY WRAPPER] ❌ Remote signing failed after retries ({}).", operationName);
+                    log.error("🔄 [RETRY WRAPPER] ❌ Final error: {}", ex.getMessage(), ex);
+                });
     }
 
     public boolean isRecoverableError(Throwable throwable) {
@@ -230,6 +264,10 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
     public Mono<Boolean> validateCertificate(String accessToken) {
         credentialID = remoteSignatureConfig.getRemoteSignatureCredentialId();
         String credentialListEndpoint = remoteSignatureConfig.getRemoteSignatureDomain() + "/csc/v2/credentials/list";
+        
+        log.info("📜 [VALIDATE CERT] Endpoint: {}", credentialListEndpoint);
+        log.info("📜 [VALIDATE CERT] Credential ID to validate: {}", credentialID);
+        
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
@@ -242,34 +280,74 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         requestBody.put("onlyValid", true);
         requestBody.put("lang", 0);
         requestBody.put("clientData", "string");
+        
         try {
             ObjectMapper objectMapperIntern = new ObjectMapper();
             String requestBodyJson = objectMapperIntern.writeValueAsString(requestBody);
+            log.info("📜 [VALIDATE CERT] Request Body: {}", requestBodyJson);
+            log.info("📜 [VALIDATE CERT] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
+            
             return httpUtils.postRequest(credentialListEndpoint, headers, requestBodyJson)
+                    .doOnSuccess(response -> {
+                        log.info("📜 [VALIDATE CERT] ✅ Response received, length: {} chars", response != null ? response.length() : 0);
+                        log.debug("📜 [VALIDATE CERT] Response Body: {}", response);
+                    })
                     .flatMap(responseJson -> {
                         try {
                             Map<String, List<String>> responseMap = objectMapperIntern.readValue(responseJson, Map.class);
+                            log.info("📜 [VALIDATE CERT] Response keys: {}", responseMap.keySet());
+                            
                             List<String> receivedCredentialIDs = responseMap.get("credentialIDs");
+                            log.info("📜 [VALIDATE CERT] Received credential IDs: {}", receivedCredentialIDs);
+                            
                             boolean isValid = receivedCredentialIDs != null &&
                                     receivedCredentialIDs.stream()
                                             .anyMatch(id -> id.trim().equalsIgnoreCase(credentialID.trim()));
+                            
+                            if (isValid) {
+                                log.info("📜 [VALIDATE CERT] ✅ Credential validation successful");
+                            } else {
+                                log.warn("📜 [VALIDATE CERT] ⚠️ Credential validation failed - ID not found in list");
+                            }
                             return Mono.just(isValid);
                         } catch (JsonProcessingException e) {
+                            log.error("📜 [VALIDATE CERT] ❌ Error parsing certificate list response", e);
                             return Mono.error(new RemoteSignatureException("Error parsing certificate list response", e));
                         }
                     })
                     .switchIfEmpty(Mono.just(false))
-                    .doOnError(error -> log.error("Error validating certificate: {}", error.getMessage()));
+                    .doOnError(error -> {
+                        log.error("📜 [VALIDATE CERT] ❌ Error validating certificate: {}", error.getMessage(), error);
+                        if (error instanceof WebClientResponseException webEx) {
+                            log.error("📜 [VALIDATE CERT] ❌ HTTP Status: {}", webEx.getStatusCode());
+                            log.error("📜 [VALIDATE CERT] ❌ Response Body: {}", webEx.getResponseBodyAsString());
+                        }
+                    });
         } catch (JsonProcessingException e) {
+            log.error("📜 [VALIDATE CERT] ❌ Failed to serialize request body", e);
             return Mono.error(new RemoteSignatureException(SERIALIZING_ERROR, e));
         }
     }
 
     public Mono<String> getSignedSignature(SignatureRequest signatureRequest, String token) {
-        return switch (remoteSignatureConfig.getRemoteSignatureType()) {
-            case SIGNATURE_REMOTE_TYPE_SERVER -> getSignedDocumentDSS(signatureRequest, token);
-            case SIGNATURE_REMOTE_TYPE_CLOUD -> getSignedDocumentExternal(signatureRequest);
-            default -> Mono.error(new RemoteSignatureException("Remote signature service not available"));
+        String signatureType = remoteSignatureConfig.getRemoteSignatureType();
+        log.info("🔀 [SIGNATURE ROUTING] Remote Signature Type: {}", signatureType);
+        log.info("🔀 [SIGNATURE ROUTING] Available types: {} (DSS), {} (Cloud)", 
+                SIGNATURE_REMOTE_TYPE_SERVER, SIGNATURE_REMOTE_TYPE_CLOUD);
+        
+        return switch (signatureType) {
+            case SIGNATURE_REMOTE_TYPE_SERVER -> {
+                log.info("🔀 [SIGNATURE ROUTING] ➡️ Routing to DSS Service");
+                yield getSignedDocumentDSS(signatureRequest, token);
+            }
+            case SIGNATURE_REMOTE_TYPE_CLOUD -> {
+                log.info("🔀 [SIGNATURE ROUTING] ➡️ Routing to External Cloud Service");
+                yield getSignedDocumentExternal(signatureRequest);
+            }
+            default -> {
+                log.error("🔀 [SIGNATURE ROUTING] ❌ Unknown signature type: {}", signatureType);
+                yield Mono.error(new RemoteSignatureException("Remote signature service not available"));
+            }
         };
     }
 
@@ -278,26 +356,50 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
                 + remoteSignatureConfig.getRemoteSignatureSignPath();
         String signatureRequestJSON;
 
-        log.info("Requesting signature to DSS service");
+        log.info("🔑 [DSS SIGNATURE] Requesting signature to DSS service");
+        log.info("🔑 [DSS SIGNATURE] Endpoint: {}", signatureRemoteServerEndpoint);
 
         try {
             signatureRequestJSON = objectMapper.writeValueAsString(signatureRequest);
+            log.info("🔑 [DSS SIGNATURE] Request Body Length: {} chars", signatureRequestJSON.length());
+            log.debug("🔑 [DSS SIGNATURE] Request Body: {}", signatureRequestJSON);
         } catch (JsonProcessingException e) {
+            log.error("🔑 [DSS SIGNATURE] ❌ Failed to serialize request body", e);
             return Mono.error(new RemoteSignatureException(SERIALIZING_ERROR, e));
         }
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, token));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+        log.info("🔑 [DSS SIGNATURE] Headers: Authorization=*****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
+        
         return httpUtils.postRequest(signatureRemoteServerEndpoint, headers, signatureRequestJSON)
-                .doOnError(error -> log.error("Error signing credential with server method: {}", error.getMessage()));
+                .doOnSuccess(response -> {
+                    log.info("🔑 [DSS SIGNATURE] ✅ Response received, length: {} chars", response != null ? response.length() : 0);
+                    log.debug("🔑 [DSS SIGNATURE] Response Body: {}", response);
+                })
+                .doOnError(error -> {
+                    log.error("🔑 [DSS SIGNATURE] ❌ Error signing credential with server method: {}", error.getMessage(), error);
+                    if (error instanceof WebClientResponseException webEx) {
+                        log.error("🔑 [DSS SIGNATURE] ❌ HTTP Status: {}", webEx.getStatusCode());
+                        log.error("🔑 [DSS SIGNATURE] ❌ Response Body: {}", webEx.getResponseBodyAsString());
+                    }
+                });
     }
 
     public Mono<String> getSignedDocumentExternal(SignatureRequest signatureRequest) {
-        log.info("Requesting signature to external service");
+        log.info("🌐 [EXTERNAL SIGNATURE FLOW] ========== STARTING EXTERNAL SIGNATURE FLOW ==========");
+        log.info("🌐 [EXTERNAL SIGNATURE FLOW] Requesting signature to external cloud service");
+        log.info("🌐 [EXTERNAL SIGNATURE FLOW] Signature Type: {}", signatureRequest.configuration().type());
+        
         return requestAccessToken(signatureRequest, SIGNATURE_REMOTE_SCOPE_CREDENTIAL)
+                .doOnSuccess(token -> log.info("🌐 [EXTERNAL SIGNATURE FLOW] ✅ Step 1/3: Access Token obtained"))
                 .flatMap(accessToken -> requestSad(accessToken)
+                        .doOnSuccess(sad -> log.info("🌐 [EXTERNAL SIGNATURE FLOW] ✅ Step 2/3: SAD obtained"))
                         .flatMap(sad -> sendSignatureRequest(signatureRequest, accessToken, sad)
-                                .flatMap(responseJson -> processSignatureResponse(signatureRequest, responseJson))));
+                                .doOnSuccess(response -> log.info("🌐 [EXTERNAL SIGNATURE FLOW] ✅ Step 3/3: Signature response received"))
+                                .flatMap(responseJson -> processSignatureResponse(signatureRequest, responseJson)
+                                        .doOnSuccess(result -> log.info("🌐 [EXTERNAL SIGNATURE FLOW] ========== EXTERNAL SIGNATURE FLOW COMPLETED ==========")))))
+                .doOnError(error -> log.error("🌐 [EXTERNAL SIGNATURE FLOW] ❌ Flow failed: {}", error.getMessage(), error));
     }
 
     public Mono<String> requestSad(String accessToken) {
@@ -306,6 +408,10 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String authDataId = "password";
         String authDataValue = remoteSignatureConfig.getRemoteSignatureCredentialPassword();
         String signatureGetSadEndpoint = remoteSignatureConfig.getRemoteSignatureDomain() + "/csc/v2/credentials/authorize";
+
+        log.info("🔐 [REQUEST SAD] Endpoint: {}", signatureGetSadEndpoint);
+        log.info("🔐 [REQUEST SAD] Credential ID: {}", credentialID);
+        log.info("🔐 [REQUEST SAD] Number of Signatures: {}", numSignatures);
 
         requestBody.clear();
         requestBody.put(CREDENTIAL_ID, credentialID);
@@ -318,33 +424,48 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String jsonBody;
         try {
             jsonBody = objectMapper.writeValueAsString(requestBody);
+            // Sanitize password from logs
+            String sanitizedBody = jsonBody.replaceAll("(\"" + AUTH_DATA_VALUE + "\"\s*:\s*\")[^\"]*", "$1*****");
+            log.info("🔐 [REQUEST SAD] Request Body: {}", sanitizedBody);
         } catch (JsonProcessingException e) {
+            log.error("🔐 [REQUEST SAD] ❌ Failed to serialize request body", e);
             return Mono.error(new SadException("Error serializing JSON request body"));
         }
-
 
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+        log.info("🔐 [REQUEST SAD] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
+        
         return httpUtils.postRequest(signatureGetSadEndpoint, headers, jsonBody)
+                .doOnSuccess(response -> {
+                    log.info("🔐 [REQUEST SAD] ✅ Raw response received, length: {} chars", response != null ? response.length() : 0);
+                    log.debug("🔐 [REQUEST SAD] Response Body: {}", response);
+                })
                 .flatMap(responseJson -> Mono.fromCallable(() -> {
                     try {
                         Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
                         if (!responseMap.containsKey(SAD_NAME)) {
+                            log.error("🔐 [REQUEST SAD] ❌ SAD missing in response. Available keys: {}", responseMap.keySet());
                             throw new SadException("SAD missing in response");
                         }
-                        return (String) responseMap.get(SAD_NAME);
+                        String sad = (String) responseMap.get(SAD_NAME);
+                        log.info("🔐 [REQUEST SAD] ✅ SAD extracted successfully, length: {} chars", sad != null ? sad.length() : 0);
+                        return sad;
                     } catch (JsonProcessingException e) {
+                        log.error("🔐 [REQUEST SAD] ❌ Error parsing SAD response", e);
                         throw new SadException("Error parsing SAD response");
                     }
                 }))
                 .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.error("🔐 [REQUEST SAD] ❌ HTTP Status: {}", ex.getStatusCode());
+                    log.error("🔐 [REQUEST SAD] ❌ Response Body: {}", ex.getResponseBodyAsString());
                     if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                         return Mono.error(new RemoteSignatureException("Unauthorized: Invalid credentials"));
                     }
                     return Mono.error(ex);
                 })
-                .doOnError(error -> log.error("Error retrieving access token: {}", error.getMessage()));
+                .doOnError(error -> log.error("🔐 [REQUEST SAD] ❌ Error retrieving SAD: {}", error.getMessage(), error));
     }
 
     public Mono<String> requestAccessToken(SignatureRequest signatureRequest, String scope) {
@@ -356,11 +477,19 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String signatureGetAccessTokenEndpoint = remoteSignatureConfig.getRemoteSignatureDomain() + "/oauth2/token";
         String hashAlgorithmOID = "2.16.840.1.101.3.4.2.1";
 
+        log.info("🎫 [ACCESS TOKEN] Endpoint: {}", signatureGetAccessTokenEndpoint);
+        log.info("🎫 [ACCESS TOKEN] Grant Type: {}", grantType);
+        log.info("🎫 [ACCESS TOKEN] Scope: {}", scope);
+        log.info("🎫 [ACCESS TOKEN] Client ID: {}", clientId);
+
         requestBody.clear();
         requestBody.put("grant_type", grantType);
         requestBody.put("scope", scope);
         if (scope.equals(SIGNATURE_REMOTE_SCOPE_CREDENTIAL)) {
-            requestBody.put("authorization_details", buildAuthorizationDetails(signatureRequest.data(), hashAlgorithmOID));
+            String authDetails = buildAuthorizationDetails(signatureRequest.data(), hashAlgorithmOID);
+            requestBody.put("authorization_details", authDetails);
+            log.info("🎫 [ACCESS TOKEN] Authorization Details included (length: {} chars)", authDetails.length());
+            log.debug("🎫 [ACCESS TOKEN] Authorization Details: {}", authDetails);
         }
 
         String requestBodyString = requestBody.entrySet().stream()
@@ -368,44 +497,62 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
                 .reduce((p1, p2) -> p1 + "&" + p2)
                 .orElse("");
 
+        log.info("🎫 [ACCESS TOKEN] Request Body Length: {} chars", requestBodyString.length());
+        log.debug("🎫 [ACCESS TOKEN] Request Body (raw): {}", requestBodyString);
+
         String basicAuthHeader = "Basic " + Base64.getEncoder()
                 .encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
 
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, basicAuthHeader));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE));
+        log.info("🎫 [ACCESS TOKEN] Headers: Authorization=Basic *****, Content-Type={}", MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+        
         return httpUtils.postRequest(signatureGetAccessTokenEndpoint, headers, requestBodyString)
+                .doOnSuccess(response -> {
+                    log.info("🎫 [ACCESS TOKEN] ✅ Raw response received, length: {} chars", response != null ? response.length() : 0);
+                    log.debug("🎫 [ACCESS TOKEN] Response Body: {}", response);
+                })
                 .flatMap(responseJson -> Mono.fromCallable(() -> {
                     try {
                         Map<String, Object> responseMap = objectMapper.readValue(responseJson, Map.class);
                         if (!responseMap.containsKey(ACCESS_TOKEN_NAME)) {
+                            log.error("🎫 [ACCESS TOKEN] ❌ Access token missing in response. Available keys: {}", responseMap.keySet());
                             throw new AccessTokenException("Access token missing in response");
                         }
-                        return (String) responseMap.get(ACCESS_TOKEN_NAME);
+                        String token = (String) responseMap.get(ACCESS_TOKEN_NAME);
+                        log.info("🎫 [ACCESS TOKEN] ✅ Access token extracted successfully, length: {} chars", token != null ? token.length() : 0);
+                        return token;
                     } catch (JsonProcessingException e) {
+                        log.error("🎫 [ACCESS TOKEN] ❌ Error parsing access token response", e);
                         throw new AccessTokenException("Error parsing access token response", e);
                     }
                 }))
                 .onErrorResume(WebClientResponseException.class, ex -> {
-                    log.error("❌ Access token endpoint [{}] returned {} {}",
+                    log.error("🎫 [ACCESS TOKEN] ❌ Endpoint [{}] returned {} {}",
                             signatureGetAccessTokenEndpoint, ex.getStatusCode(), ex.getStatusText());
+                    log.error("🎫 [ACCESS TOKEN] ❌ Response Body: {}", ex.getResponseBodyAsString());
                     if (ex.getStatusCode() == HttpStatus.UNAUTHORIZED) {
                         return Mono.error(new RemoteSignatureException("Unauthorized: Invalid credentials"));
                     }
                     return Mono.error(new RemoteSignatureException("Remote service error while retrieving access token", ex));
                 })
                 .onErrorResume(UnknownHostException.class, ex -> {
-                    log.error("❌ Could not resolve host [{}] - check DNS or VPN", signatureGetAccessTokenEndpoint);
+                    log.error("🎫 [ACCESS TOKEN] ❌ Could not resolve host [{}] - check DNS or VPN", signatureGetAccessTokenEndpoint);
                     return Mono.error(new RemoteSignatureException("Signature service unreachable: DNS resolution failed", ex));
                 })
                 .onErrorResume(Exception.class, ex -> {
-                    log.error("❌ Unexpected error accessing [{}]: {}", signatureGetAccessTokenEndpoint, ex.getMessage());
+                    log.error("🎫 [ACCESS TOKEN] ❌ Unexpected error accessing [{}]: {}", signatureGetAccessTokenEndpoint, ex.getMessage(), ex);
                     return Mono.error(new RemoteSignatureException("Unexpected error retrieving access token", ex));
                 });
     }
 
     public Mono<String> requestCertificateInfo(String accessToken, String credentialID) {
         String credentialsInfoEndpoint = remoteSignatureConfig.getRemoteSignatureDomain() + "/csc/v2/credentials/info";
+        
+        log.info("📋 [CERT INFO] Endpoint: {}", credentialsInfoEndpoint);
+        log.info("📋 [CERT INFO] Credential ID: {}", credentialID);
+        
         requestBody.clear();
         requestBody.put(CREDENTIAL_ID, credentialID);
         requestBody.put(CERTIFICATES, "chain");
@@ -415,14 +562,29 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String requestBodySignature;
         try {
             requestBodySignature = objectMapper.writeValueAsString(requestBody);
+            log.info("📋 [CERT INFO] Request Body: {}", requestBodySignature);
         } catch (JsonProcessingException e) {
+            log.error("📋 [CERT INFO] ❌ Failed to serialize request body", e);
             return Mono.error(new RuntimeException(SERIALIZING_ERROR, e));
         }
+        
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+        log.info("📋 [CERT INFO] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
+        
         return httpUtils.postRequest(credentialsInfoEndpoint, headers, requestBodySignature)
-                .doOnError(error -> log.error("Error sending credential to sign: {}", error.getMessage()));
+                .doOnSuccess(response -> {
+                    log.info("📋 [CERT INFO] ✅ Response received, length: {} chars", response != null ? response.length() : 0);
+                    log.debug("📋 [CERT INFO] Response Body: {}", response);
+                })
+                .doOnError(error -> {
+                    log.error("📋 [CERT INFO] ❌ Error requesting certificate info: {}", error.getMessage(), error);
+                    if (error instanceof WebClientResponseException webEx) {
+                        log.error("📋 [CERT INFO] ❌ HTTP Status: {}", webEx.getStatusCode());
+                        log.error("📋 [CERT INFO] ❌ Response Body: {}", webEx.getResponseBodyAsString());
+                    }
+                });
     }
 
     public Mono<DetailedIssuer> extractIssuerFromCertificateInfo(String certificateInfo) {
@@ -545,7 +707,17 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String conformanceLevel = "Ades-B";
         String signAlgorithm = "OID_sign_algorithm";
 
+        log.info("✍️ [SIGN REQUEST] Endpoint: {}", signatureRemoteServerEndpoint);
+        log.info("✍️ [SIGN REQUEST] Credential ID: {}", credentialID);
+        log.info("✍️ [SIGN REQUEST] Signature Qualifier: {}", signatureQualifier);
+        log.info("✍️ [SIGN REQUEST] Signature Format: {}", signatureFormat);
+        log.info("✍️ [SIGN REQUEST] Conformance Level: {}", conformanceLevel);
+        log.info("✍️ [SIGN REQUEST] Sign Algorithm: {}", signAlgorithm);
+        log.info("✍️ [SIGN REQUEST] Original Document Length: {} chars", signatureRequest.data().length());
+
         String base64Document = Base64.getEncoder().encodeToString(signatureRequest.data().getBytes(StandardCharsets.UTF_8));
+        log.info("✍️ [SIGN REQUEST] Base64 Encoded Document Length: {} chars", base64Document.length());
+        
         requestBody.clear();
         requestBody.put(CREDENTIAL_ID, credentialID);
         requestBody.put(SAD_NAME, sad);
@@ -563,38 +735,80 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String requestBodySignature;
         try {
             requestBodySignature = objectMapper.writeValueAsString(requestBody);
+            // Sanitize SAD from logs
+            String sanitizedBody = requestBodySignature.replaceAll("(\"" + SAD_NAME + "\"\s*:\s*\")[^\"]*", "$1*****");
+            log.info("✍️ [SIGN REQUEST] Request Body Length: {} chars", requestBodySignature.length());
+            log.debug("✍️ [SIGN REQUEST] Request Body (sanitized): {}", sanitizedBody);
         } catch (JsonProcessingException e) {
+            log.error("✍️ [SIGN REQUEST] ❌ Failed to serialize request body", e);
             return Mono.error(new RuntimeException(SERIALIZING_ERROR, e));
         }
 
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+        log.info("✍️ [SIGN REQUEST] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
+        
         return httpUtils.postRequest(signatureRemoteServerEndpoint, headers, requestBodySignature)
-                .doOnError(error -> log.error("Error sending credential to sign: {}", error.getMessage()));
+                .doOnSuccess(response -> {
+                    log.info("✍️ [SIGN REQUEST] ✅ Raw response received, length: {} chars", response != null ? response.length() : 0);
+                    log.debug("✍️ [SIGN REQUEST] Response Body: {}", response);
+                })
+                .doOnError(error -> {
+                    log.error("✍️ [SIGN REQUEST] ❌ Error sending credential to sign: {}", error.getMessage(), error);
+                    if (error instanceof WebClientResponseException webEx) {
+                        log.error("✍️ [SIGN REQUEST] ❌ HTTP Status: {}", webEx.getStatusCode());
+                        log.error("✍️ [SIGN REQUEST] ❌ Response Body: {}", webEx.getResponseBodyAsString());
+                    }
+                });
     }
 
     public Mono<String> processSignatureResponse(SignatureRequest signatureRequest, String responseJson) {
+        log.info("📦 [PROCESS RESPONSE] Starting signature response processing");
+        log.info("📦 [PROCESS RESPONSE] Response JSON Length: {} chars", responseJson != null ? responseJson.length() : 0);
+        log.debug("📦 [PROCESS RESPONSE] Response JSON: {}", responseJson);
+        
         return Mono.fromCallable(() -> {
             try {
                 Map<String, List<String>> responseMap = objectMapper.readValue(responseJson, Map.class);
+                log.info("📦 [PROCESS RESPONSE] Response keys: {}", responseMap.keySet());
+                
                 List<String> documentsWithSignatureList = responseMap.get("DocumentWithSignature");
 
                 if (documentsWithSignatureList == null || documentsWithSignatureList.isEmpty()) {
+                    log.error("📦 [PROCESS RESPONSE] ❌ No signature found in the response");
                     throw new SignatureProcessingException("No signature found in the response");
                 }
+                
+                log.info("📦 [PROCESS RESPONSE] Number of signed documents: {}", documentsWithSignatureList.size());
                 String documentsWithSignature = documentsWithSignatureList.get(0);
+                log.info("📦 [PROCESS RESPONSE] Signed document (base64) length: {} chars", documentsWithSignature.length());
+                
                 String documentsWithSignatureDecoded = new String(Base64.getDecoder().decode(documentsWithSignature), StandardCharsets.UTF_8);
+                log.info("📦 [PROCESS RESPONSE] Decoded signed document length: {} chars", documentsWithSignatureDecoded.length());
+                log.debug("📦 [PROCESS RESPONSE] Decoded signed document: {}", documentsWithSignatureDecoded);
+                
                 String receivedPayloadDecoded = jwtUtils.decodePayload(documentsWithSignatureDecoded);
+                log.info("📦 [PROCESS RESPONSE] Extracted payload length: {} chars", receivedPayloadDecoded.length());
+                log.debug("📦 [PROCESS RESPONSE] Extracted payload: {}", receivedPayloadDecoded);
+                
+                log.info("📦 [PROCESS RESPONSE] Validating payload matches original data...");
                 if (jwtUtils.areJsonsEqual(receivedPayloadDecoded, signatureRequest.data())) {
-                    return objectMapper.writeValueAsString(Map.of(
+                    log.info("📦 [PROCESS RESPONSE] ✅ Payload validation successful - signatures match");
+                    String result = objectMapper.writeValueAsString(Map.of(
                             "type", signatureRequest.configuration().type().name(),
                             "data", documentsWithSignatureDecoded
                     ));
+                    log.info("📦 [PROCESS RESPONSE] ✅ Final result prepared, length: {} chars", result.length());
+                    return result;
                 } else {
+                    log.error("📦 [PROCESS RESPONSE] ❌ Payload validation failed - signed payload does not match original");
+                    log.error("📦 [PROCESS RESPONSE] ❌ Original data length: {}", signatureRequest.data().length());
+                    log.error("📦 [PROCESS RESPONSE] ❌ Received payload length: {}", receivedPayloadDecoded.length());
                     throw new SignatureProcessingException("Signed payload received does not match the original data");
                 }
             } catch (JsonProcessingException e) {
+                log.error("📦 [PROCESS RESPONSE] ❌ Error parsing signature response", e);
                 throw new SignatureProcessingException("Error parsing signature response", e);
             }
         });
