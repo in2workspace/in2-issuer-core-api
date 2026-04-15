@@ -143,23 +143,55 @@ public class VerifierServiceImpl implements VerifierService {
     @Override
     public Mono<OpenIDProviderMetadata> getWellKnownInfo() {
         String wellKnownInfoEndpoint = appConfig.getVerifierUrl() + AUTHORIZATION_SERVER_METADATA_WELL_KNOWN_PATH;
+        log.info("[DEBUG-M2M] getWellKnownInfo() - Fetching from: {}", wellKnownInfoEndpoint);
 
         return oauth2VerifierWebClient.get()
                 .uri(wellKnownInfoEndpoint)
                 .retrieve()
                 .bodyToMono(OpenIDProviderMetadata.class)
+                .doOnNext(metadata -> log.info("[DEBUG-M2M] getWellKnownInfo() - SUCCESS. Token endpoint: {}", metadata.tokenEndpoint()))
+                .doOnError(e -> log.error("[DEBUG-M2M] getWellKnownInfo() - FAILED: {} - {}", e.getClass().getSimpleName(), e.getMessage()))
                 .onErrorMap(e -> new WellKnownInfoFetchException("Error fetching OpenID Provider Metadata", e));
     }
 
     @Override
     public Mono<VerifierOauth2AccessToken> performTokenRequest(String body) {
+        log.info("[DEBUG-M2M] performTokenRequest() - Starting token request");
+        log.info("[DEBUG-M2M] performTokenRequest() - Body length: {} chars", body != null ? body.length() : "NULL");
+        // Log first 200 chars of body to see parameters (truncate for security)
+        if (body != null) {
+            String truncatedBody = body.length() > 200 ? body.substring(0, 200) + "..." : body;
+            log.info("[DEBUG-M2M] performTokenRequest() - Body preview: {}", truncatedBody);
+        }
+
         return getWellKnownInfo()
+                .doOnNext(metadata -> log.info("[DEBUG-M2M] performTokenRequest() - Will POST to: {}", metadata.tokenEndpoint()))
                 .flatMap(metadata -> oauth2VerifierWebClient.post()
                         .uri(metadata.tokenEndpoint())
                         .header(CONTENT_TYPE, CONTENT_TYPE_URL_ENCODED_FORM)
                         .bodyValue(body)
-                        .retrieve()
-                        .bodyToMono(VerifierOauth2AccessToken.class)
-                        .onErrorMap(e -> new TokenFetchException("Error fetching the token", e)));
+                        .exchangeToMono(response -> {
+                            log.info("[DEBUG-M2M] performTokenRequest() - Response status: {}", response.statusCode());
+                            if (response.statusCode().is2xxSuccessful()) {
+                                return response.bodyToMono(VerifierOauth2AccessToken.class)
+                                        .doOnNext(token -> log.info("[DEBUG-M2M] performTokenRequest() - SUCCESS! Token type: {}, expires_in: {}", 
+                                                token.tokenType(), token.expiresIn()));
+                            } else {
+                                return response.bodyToMono(String.class)
+                                        .defaultIfEmpty("[no body]")
+                                        .flatMap(errorBody -> {
+                                            log.error("[DEBUG-M2M] performTokenRequest() - FAILED! Status: {}, Body: {}", 
+                                                    response.statusCode(), errorBody);
+                                            return Mono.error(new TokenFetchException(
+                                                    "Error fetching the token. Status: " + response.statusCode() + ", Body: " + errorBody, null));
+                                        });
+                            }
+                        })
+                        .doOnError(e -> log.error("[DEBUG-M2M] performTokenRequest() - Exception: {} - {}", 
+                                e.getClass().getSimpleName(), e.getMessage(), e))
+                        .onErrorMap(e -> {
+                            if (e instanceof TokenFetchException) return e;
+                            return new TokenFetchException("Error fetching the token", e);
+                        }));
     }
 }

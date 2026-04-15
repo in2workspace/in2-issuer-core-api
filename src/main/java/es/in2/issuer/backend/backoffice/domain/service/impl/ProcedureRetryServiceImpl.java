@@ -76,18 +76,26 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         UUID procedureId,
         LabelCredentialDeliveryPayload payload
     ) {
+        log.info("[DEBUG-M2M] ========== INITIAL FLOW START ==========");
+        log.info("[DEBUG-M2M] handleInitialLabelDeliveryAction() - procedureId: {}, credId: {}", procedureId, payload.credentialId());
+        log.info("[DEBUG-M2M] handleInitialLabelDeliveryAction() - Thread: {}", Thread.currentThread().getName());
+        
         return deliverLabelWithImmediateRetries(payload)
                 .flatMap(result -> {
+                    log.info("[DEBUG-M2M] handleInitialLabelDeliveryAction() - SUCCESS for credId: {}", payload.credentialId());
                     log.info("[DELIVERY] Initial delivery succeeded for credId: {}", payload.credentialId());
                     return sendSuccessNotificationSafely(payload.companyEmail(), payload.credentialId(), result);
                 })
                 .onErrorResume(e -> {
+                    log.error("[DEBUG-M2M] handleInitialLabelDeliveryAction() - FAILED for credId: {}: {} - {}", 
+                            payload.credentialId(), e.getClass().getSimpleName(), e.getMessage());
                     log.error("[DELIVERY] Initial delivery failed after all retries for credId: {} - {}",
                             payload.credentialId(), e.getMessage());
 
                     return createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
                             .then(sendInitialFailureNotificationSafely(payload.companyEmail(), payload.credentialId()));
-                });
+                })
+                .doFinally(signal -> log.info("[DEBUG-M2M] ========== INITIAL FLOW END (signal: {}) ==========", signal));
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -121,13 +129,21 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     private Mono<Void> handleScheduledLabelDelivery(ProcedureRetry retryRecord) {
+        log.info("[DEBUG-M2M] ========== SCHEDULER RETRY FLOW START ==========");
+        log.info("[DEBUG-M2M] handleScheduledLabelDelivery() - procedureId: {}, attemptCount: {}", 
+                retryRecord.getProcedureId(), retryRecord.getAttemptCount());
+        log.info("[DEBUG-M2M] handleScheduledLabelDelivery() - Thread: {}", Thread.currentThread().getName());
+        log.info("[DEBUG-M2M] handleScheduledLabelDelivery() - Payload from DB: {}", retryRecord.getPayload());
         log.info("[SCHEDULER] Processing retry attempt {} for procedure {} action {}",
                 retryRecord.getAttemptCount() + 1, retryRecord.getProcedureId(), retryRecord.getActionType());
 
         return deserializePayload(retryRecord)
+                .doOnNext(payload -> log.info("[DEBUG-M2M] handleScheduledLabelDelivery() - Deserialized payload. credId: {}, responseUri: {}", 
+                        payload.credentialId(), payload.responseUri()))
                 .flatMap(payload ->
                         deliverLabelWithImmediateRetries(payload)
                                 .flatMap(result -> {
+                                    log.info("[DEBUG-M2M] handleScheduledLabelDelivery() - SUCCESS for procedureId: {}", retryRecord.getProcedureId());
                                     log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
                                     return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
                                             .then(sendSuccessNotificationSafely(
@@ -138,10 +154,13 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                                 })
                 )
                 .onErrorResume(e -> {
+                    log.error("[DEBUG-M2M] handleScheduledLabelDelivery() - FAILED for procedureId: {}: {} - {}", 
+                            retryRecord.getProcedureId(), e.getClass().getSimpleName(), e.getMessage(), e);
                     log.warn("[SCHEDULER] Delivery failed for procedure {}: {}",
                             retryRecord.getProcedureId(), e.getMessage(), e);
                     return updateRetryAfterScheduledFailure(retryRecord);
-                });
+                })
+                .doFinally(signal -> log.info("[DEBUG-M2M] ========== SCHEDULER RETRY FLOW END (signal: {}) ==========", signal));
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -149,8 +168,15 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     private Mono<ResponseUriDeliveryResult> deliverLabelWithImmediateRetries(LabelCredentialDeliveryPayload payload) {
-        log.info("[DELIVERY] Attempting to deliver label for credId: {} with immediate retries", payload.credentialId());
+        log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - STARTING for credId: {}", payload.credentialId());
+        log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - responseUri: {}", payload.responseUri());
+        log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - signedCredential length: {}", 
+                payload.signedCredential() != null ? payload.signedCredential().length() : "NULL");
+        log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - Thread: {}", Thread.currentThread().getName());
+        
         return m2mTokenService.getM2MToken()
+                .doOnSubscribe(s -> log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - Subscribed to getM2MToken()"))
+                .doOnNext(token -> log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - Got M2M token, will call deliverLabelToResponseUri"))
                 .flatMap(m2mToken ->
                         credentialDeliveryService.deliverLabelToResponseUri(
                                 payload.responseUri(),
@@ -159,6 +185,9 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                                 m2mToken.accessToken()
                         )
                 )
+                .doOnSuccess(result -> log.info("[DEBUG-M2M] deliverLabelWithImmediateRetries() - SUCCESS for credId: {}", payload.credentialId()))
+                .doOnError(e -> log.error("[DEBUG-M2M] deliverLabelWithImmediateRetries() - FAILED for credId: {}: {} - {}", 
+                        payload.credentialId(), e.getClass().getSimpleName(), e.getMessage()))
                 .retryWhen(createRetrySpec("deliverLabel", INITIAL_RETRY_ATTEMPTS, INITIAL_RETRY_DELAYS));
     }
 
