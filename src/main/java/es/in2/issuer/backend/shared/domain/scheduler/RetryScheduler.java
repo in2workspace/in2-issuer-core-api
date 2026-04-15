@@ -19,7 +19,8 @@ public class RetryScheduler {
     private final ProcedureRetryService procedureRetryService;
 
 //  todo  restore @Scheduled(fixedRate = 12 * 60 * 60 * 1000) // Every 12 hours (in milliseconds)
-    @Scheduled(initialDelay = 100000, fixedRate = 75 * 1000) // Every 75 seconds (in milliseconds)
+    // The initial delay is required to avoid error when the Verifier calls the credential status list endpoint in the m2m auth flow
+    @Scheduled(initialDelay = 120000, fixedRate = 75 * 1000) // Every 75 seconds (in milliseconds)
     public Mono<Void> processRetries() {
         log.info("[RETRY] [RetryScheduler] Scheduled Task - Executing retry processing at: {}", Instant.now());
         return procedureRetryService.processPendingRetries()
