@@ -239,6 +239,6 @@ public class DeferredCredentialMetadataServiceImpl implements DeferredCredential
         log.debug("Getting transactionCode by procedureId: {}", procedureId);
         return deferredCredentialMetadataRepository.findByProcedureId(UUID.fromString(procedureId))
                 .map(DeferredCredentialMetadata::getTransactionCode)
-                .doOnNext(transactionCode -> log.debug("Found transactionCode: {} for procedureId: {}", transactionCode, procedureId));
+                .doOnNext(ignored -> log.debug("Found transactionCode for procedureId: {}", procedureId));
     }
 }

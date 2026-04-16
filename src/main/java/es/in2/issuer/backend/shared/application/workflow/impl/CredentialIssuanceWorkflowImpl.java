@@ -131,10 +131,9 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                         )
                                         .onErrorResume(signingError -> {
                                             log.error("ProcessID: {} - Label credential signing failed: {}", processId, signingError.getMessage());
-                                            // Update status to PEND_SIGNATURE and propagate error
                                             return credentialProcedureService.updateCredentialStatusToPendSignature(procId)
                                                     .then(Mono.error(new RemoteSignatureException(
-                                                            "Label credential signing failed. Credential saved with PEND_SIGNATURE status for later retry."
+                                                            "Label credential signing failed. Credential saved with PEND_SIGNATURE status for later retry.", signingError
                                                     )));
                                         })
                                 )
@@ -182,7 +181,10 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                                     payload
                                             )
                                             .subscribeOn(Schedulers.boundedElastic())
-                                            .subscribe();
+                                            .subscribe(
+                                                    unused -> log.debug("Triggered label credential delivery retry pipeline for procedureId: {}", procedureId),
+                                                    error -> log.error("Failed to trigger label credential delivery retry pipeline for procedureId: {}: {}", procedureId, error.getMessage(), error)
+                                            );
 
                                     return Mono.empty();
                                 })

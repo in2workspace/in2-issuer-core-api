@@ -54,7 +54,6 @@ public class SendReminderServiceImpl implements SendReminderService {
                         case DRAFT, WITHDRAWN ->
                             updateMetadataAndSendActivationEmail(procedureId, emailInfo.email(), emailInfo.organization());
 
-                        // ??
                         case PEND_DOWNLOAD ->
                             emailService.sendCredentialSignedNotification(
                                     credentialProcedure.getEmail(),

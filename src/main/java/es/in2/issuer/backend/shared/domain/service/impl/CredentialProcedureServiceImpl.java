@@ -410,7 +410,7 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
                     log.debug("Updating credential status to PEND_SIGNATURE for procedureId: {}", procedureId);
                     credentialProcedure.setCredentialStatus(CredentialStatusEnum.PEND_SIGNATURE);
                     return credentialProcedureRepository.save(credentialProcedure)
-                            .doOnSuccess(result -> log.info(UPDATED_CREDENTIAL, "credentialProcedure: " + credentialProcedure))
+                            .doOnSuccess(result -> log.info("{} procedureId: {}", UPDATED_CREDENTIAL, procedureId))
                             .then();
                 });
     }
