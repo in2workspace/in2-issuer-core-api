@@ -91,7 +91,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                             if (LABEL_CREDENTIAL.equals(preSubmittedCredentialDataRequest.schema())) {
                                 return handleLabelCredentialIssuance(processId, transactionCode, emailInfo, token);
                             }
-                            // For other credential types, just send the credential offer email
+
                             return sendCredentialOfferEmail(transactionCode, emailInfo);
                         })
                 );
@@ -105,21 +105,17 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
     ) {
         return deferredCredentialMetadataService.getProcedureIdByTransactionCode(transactionCode)
                 .flatMap(procedureId ->
-                        // Step 1: Bind issuer to the credential
                         issuerFactory.createSimpleIssuerAndNotifyOnError(procedureId, emailInfo.email())
                                 .flatMap(issuer -> labelCredentialFactory.mapIssuer(procedureId, issuer))
                                 .flatMap(boundCredential ->
                                         credentialProcedureService.updateDecodedCredentialByProcedureId(procedureId, boundCredential)
                                                 .thenReturn(procedureId)
                                 )
-                                // Step 2: Sign the credential
                                 .flatMap(procId -> credentialSignerWorkflow.signAndUpdateCredentialByProcedureId(token, procId, JWT_VC)
                                         .flatMap(signedCredential ->
-                                                // Step 3: Update status to VALID
                                                 credentialProcedureService.updateCredentialProcedureCredentialStatusToValidByProcedureId(procId)
                                                         .then(credentialProcedureService.getCredentialProcedureById(procId))
                                                         .flatMap(credentialProcedure ->
-                                                                // Step 4: Trigger parallel delivery (email + response URI)
                                                                 triggerLabelCredentialParallelDelivery(
                                                                         procId,
                                                                         transactionCode,
