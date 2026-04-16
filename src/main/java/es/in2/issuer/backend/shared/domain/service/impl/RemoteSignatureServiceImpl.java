@@ -113,7 +113,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("📋 [SIGN ISSUED] Email: {}", email);
         log.info("📋 [SIGN ISSUED] Signature Type: {}", signatureRequest.configuration().type());
         log.info("📋 [SIGN ISSUED] Data Length: {} chars", signatureRequest.data() != null ? signatureRequest.data().length() : 0);
-        log.info("📋 [SIGN ISSUED] 🔑 Full Token:\n{}", token);
+        log.info("📋 [SIGN ISSUED] 🔑 Token (first 50 chars): {}", token != null && token.length() > 50 ? token.substring(0, 50) + "..." : token);
         log.info("📋 [SIGN ISSUED] 📄 Signature Configuration: {}", signatureRequest.configuration());
         log.info("📋 [SIGN ISSUED] 📄 Full Data to Sign:\n{}", signatureRequest.data());
 
@@ -194,7 +194,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("🔧 [SIGN SYSTEM] ⏱️ Start Time: {}", startTime);
         log.info("🔧 [SIGN SYSTEM] Signature Type: {}", signatureRequest.configuration().type());
         log.info("🔧 [SIGN SYSTEM] Data Length: {} chars", signatureRequest.data() != null ? signatureRequest.data().length() : 0);
-        log.info("🔧 [SIGN SYSTEM] 🔑 Full Token:\n{}", token);
+        log.info("🔧 [SIGN SYSTEM] 🔑 Token (first 50 chars): {}", token != null && token.length() > 50 ? token.substring(0, 50) + "..." : token);
         log.info("🔧 [SIGN SYSTEM] 📄 Signature Configuration: {}", signatureRequest.configuration());
         log.info("🔧 [SIGN SYSTEM] 📄 Full Data to Sign:\n{}", signatureRequest.data());
 
@@ -392,7 +392,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("📜 [VALIDATE CERT] ⏱️ Start Time: {}", startTime);
         log.info("📜 [VALIDATE CERT] Endpoint: {}", credentialListEndpoint);
         log.info("📜 [VALIDATE CERT] Credential ID to validate: {}", credentialID);
-        log.info("📜 [VALIDATE CERT] 🔑 Full Access Token:\n{}", accessToken);
+        log.info("📜 [VALIDATE CERT] 🔑 Access Token (first 50 chars): {}", accessToken != null && accessToken.length() > 50 ? accessToken.substring(0, 50) + "..." : accessToken);
 
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
@@ -411,7 +411,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
             ObjectMapper objectMapperIntern = new ObjectMapper();
             String requestBodyJson = objectMapperIntern.writeValueAsString(requestBody);
             log.info("📜 [VALIDATE CERT] Request Body: {}", requestBodyJson);
-            log.info("📜 [VALIDATE CERT] Headers: Authorization=Bearer {}, Content-Type={}", accessToken, MediaType.APPLICATION_JSON_VALUE);
+            log.info("📜 [VALIDATE CERT] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
 
             return httpUtils.postRequest(credentialListEndpoint, headers, requestBodyJson)
                     .doOnSuccess(response -> {
@@ -497,7 +497,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("🔑 [DSS SIGNATURE] ⏱️ Start Time: {}", startTime);
         log.info("🔑 [DSS SIGNATURE] Requesting signature to DSS service");
         log.info("🔑 [DSS SIGNATURE] Endpoint: {}", signatureRemoteServerEndpoint);
-        log.info("🔑 [DSS SIGNATURE] 🔑 Full Token:\n{}", token);
+        log.info("🔑 [DSS SIGNATURE] 🔑 Token (first 50 chars): {}", token != null && token.length() > 50 ? token.substring(0, 50) + "..." : token);
 
         try {
             signatureRequestJSON = objectMapper.writeValueAsString(signatureRequest);
@@ -510,7 +510,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, token));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
-        log.info("🔑 [DSS SIGNATURE] 📤 Headers: Authorization={}, Content-Type={}", token, MediaType.APPLICATION_JSON_VALUE);
+        log.info("🔑 [DSS SIGNATURE] 📤 Headers: Authorization={}, Content-Type={}", token != null && token.length() > 30 ? token.substring(0, 30) + "..." : token, MediaType.APPLICATION_JSON_VALUE);
 
         return httpUtils.postRequest(signatureRemoteServerEndpoint, headers, signatureRequestJSON)
                 .doOnSuccess(response -> {
@@ -592,7 +592,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("🔐 [REQUEST SAD] Endpoint: {}", signatureGetSadEndpoint);
         log.info("🔐 [REQUEST SAD] Credential ID: {}", credentialID);
         log.info("🔐 [REQUEST SAD] Number of Signatures: {}", numSignatures);
-        log.info("🔐 [REQUEST SAD] 🔑 Full Access Token:\n{}", accessToken);
+        log.info("🔐 [REQUEST SAD] 🔑 Access Token (first 50 chars): {}", accessToken != null && accessToken.length() > 50 ? accessToken.substring(0, 50) + "..." : accessToken);
 
         requestBody.clear();
         requestBody.put(CREDENTIAL_ID, credentialID);
@@ -605,8 +605,9 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String jsonBody;
         try {
             jsonBody = objectMapper.writeValueAsString(requestBody);
-            // UNMASKED FOR LOCAL TESTING - shows full credentials
-            log.info("🔐 [REQUEST SAD] 📤 Full Request Body (includes password):\n{}", jsonBody);
+            // Sanitize password from logs
+            String sanitizedBody = jsonBody.replaceAll("(\"" + AUTH_DATA_VALUE + "\"\s*:\s*\")[^\"]*", "$1*****");
+            log.info("🔐 [REQUEST SAD] Request Body: {}", sanitizedBody);
         } catch (JsonProcessingException e) {
             log.error("🔐 [REQUEST SAD] ❌ Failed to serialize request body", e);
             return Mono.error(new SadException("Error serializing JSON request body"));
@@ -615,7 +616,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
-        log.info("🔐 [REQUEST SAD] Headers: Authorization=Bearer {}, Content-Type={}", accessToken, MediaType.APPLICATION_JSON_VALUE);
+        log.info("🔐 [REQUEST SAD] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
 
         return httpUtils.postRequest(signatureGetSadEndpoint, headers, jsonBody)
                 .doOnSuccess(response -> {
@@ -695,9 +696,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, basicAuthHeader));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE));
-        log.info("🎫 [ACCESS TOKEN] 🔑 Client ID: {}", clientId);
-        log.info("🎫 [ACCESS TOKEN] 🔐 Client Secret: {}", clientSecret);
-        log.info("🎫 [ACCESS TOKEN] Headers: Authorization={}, Content-Type={}", basicAuthHeader, MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+        log.info("🎫 [ACCESS TOKEN] Headers: Authorization=Basic *****, Content-Type={}", MediaType.APPLICATION_FORM_URLENCODED_VALUE);
 
         return httpUtils.postRequest(signatureGetAccessTokenEndpoint, headers, requestBodyString)
                 .doOnSuccess(response -> {
@@ -750,7 +749,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("📋 [CERT INFO] ⏱️ Start Time: {}", startTime);
         log.info("📋 [CERT INFO] Endpoint: {}", credentialsInfoEndpoint);
         log.info("📋 [CERT INFO] Credential ID: {}", credentialID);
-        log.info("📋 [CERT INFO] 🔑 Full Access Token:\n{}", accessToken);
+        log.info("📋 [CERT INFO] 🔑 Access Token (first 50 chars): {}", accessToken != null && accessToken.length() > 50 ? accessToken.substring(0, 50) + "..." : accessToken);
 
         requestBody.clear();
         requestBody.put(CREDENTIAL_ID, credentialID);
@@ -770,7 +769,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
-        log.info("📋 [CERT INFO] Headers: Authorization=Bearer {}, Content-Type={}", accessToken, MediaType.APPLICATION_JSON_VALUE);
+        log.info("📋 [CERT INFO] Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
 
         return httpUtils.postRequest(credentialsInfoEndpoint, headers, requestBodySignature)
                 .doOnSuccess(response -> {
@@ -919,8 +918,8 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         log.info("✍️ [SIGN REQUEST] Signature Format: {}", signatureFormat);
         log.info("✍️ [SIGN REQUEST] Conformance Level: {}", conformanceLevel);
         log.info("✍️ [SIGN REQUEST] Sign Algorithm: {}", signAlgorithm);
-        log.info("✍️ [SIGN REQUEST] 🔑 Full Access Token:\n{}", accessToken);
-        log.info("✍️ [SIGN REQUEST] 🔐 Full SAD:\n{}", sad);
+        log.info("✍️ [SIGN REQUEST] 🔑 Access Token (first 50 chars): {}", accessToken != null && accessToken.length() > 50 ? accessToken.substring(0, 50) + "..." : accessToken);
+        log.info("✍️ [SIGN REQUEST] 🔐 SAD (first 50 chars): {}", sad != null && sad.length() > 50 ? sad.substring(0, 50) + "..." : sad);
         log.info("✍️ [SIGN REQUEST] 📄 Original Document Length: {} chars", signatureRequest.data().length());
         log.info("✍️ [SIGN REQUEST] 📄 Original Document:\n{}", signatureRequest.data());
 
@@ -944,9 +943,10 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         String requestBodySignature;
         try {
             requestBodySignature = objectMapper.writeValueAsString(requestBody);
-            // UNMASKED FOR LOCAL TESTING - shows full SAD
+            // Sanitize SAD from logs
+            String sanitizedBody = requestBodySignature.replaceAll("(\"" + SAD_NAME + "\"\s*:\s*\")[^\"]*", "$1*****");
             log.info("✍️ [SIGN REQUEST] 📤 Request Body Length: {} chars", requestBodySignature.length());
-            log.info("✍️ [SIGN REQUEST] 📤 Full Request Body (includes SAD):\n{}", requestBodySignature);
+            log.info("✍️ [SIGN REQUEST] 📤 Full Request Body (sanitized):\n{}", sanitizedBody);
         } catch (JsonProcessingException e) {
             log.error("✍️ [SIGN REQUEST] ❌ Failed to serialize request body", e);
             return Mono.error(new RuntimeException(SERIALIZING_ERROR, e));
@@ -955,7 +955,7 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         headers.clear();
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + accessToken));
         headers.add(new AbstractMap.SimpleEntry<>(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
-        log.info("✍️ [SIGN REQUEST] 📤 Headers: Authorization=Bearer {}, Content-Type={}", accessToken, MediaType.APPLICATION_JSON_VALUE);
+        log.info("✍️ [SIGN REQUEST] 📤 Headers: Authorization=Bearer *****, Content-Type={}", MediaType.APPLICATION_JSON_VALUE);
 
         return httpUtils.postRequest(signatureRemoteServerEndpoint, headers, requestBodySignature)
                 .doOnSuccess(response -> {
@@ -1045,7 +1045,6 @@ public class RemoteSignatureServiceImpl implements RemoteSignatureService {
         credentialID = remoteSignatureConfig.getRemoteSignatureCredentialId();
         credentialPassword = remoteSignatureConfig.getRemoteSignatureCredentialPassword();
         log.info("🔒 [AUTH DETAILS] Credential ID: {}", credentialID);
-        log.info("🔒 [AUTH DETAILS] 🔐 Credential Password: {}", credentialPassword);
         log.info("🔒 [AUTH DETAILS] Hash Algorithm OID: {}", hashAlgorithmOID);
         log.info("🔒 [AUTH DETAILS] 📄 Unsigned Credential Length: {} chars", unsignedCredential != null ? unsignedCredential.length() : 0);
         log.info("🔒 [AUTH DETAILS] 📄 Unsigned Credential:\n{}", unsignedCredential);
