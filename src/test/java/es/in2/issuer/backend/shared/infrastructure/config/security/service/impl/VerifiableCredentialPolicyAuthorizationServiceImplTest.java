@@ -532,11 +532,10 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
         JsonNode vcJsonNode = realObjectMapper.readTree(vcClaim);
         when(objectMapper.readTree(vcClaim)).thenReturn(vcJsonNode);
 
-        LEARCredentialEmployee signerEmployee = getLEARCredentialEmployee(); // Admin org with Onboarding/Execute
+        LEARCredentialEmployee signerEmployee = getLEARCredentialEmployee();
         when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim))
                 .thenReturn(signerEmployee);
 
-        // Admin path now requires payload powers validation
         LEARCredentialMachine.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialMachine.CredentialSubject.Mandate.builder()
                         .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
@@ -908,7 +907,7 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_machine_success_whenMandatorAllowed_and_OnboardingExecute() throws Exception {
-        // Arrange: Admin issuing LEARCredentialMachine with valid powers
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
@@ -932,7 +931,6 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
         when(learCredentialEmployeeFactory.mapStringToLEARCredentialEmployee(vcClaim))
                 .thenReturn(signerEmployee);
 
-        // Admin path now requires payload powers validation
         LEARCredentialMachine.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialMachine.CredentialSubject.Mandate.builder()
                         .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
@@ -1136,7 +1134,6 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
         LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithFullMandatorData();
 
         // Payload mandate: Machine mandate whose mandator matches token mandator
-        // Changed from Onboarding to ProductOffering - non-admin can only issue with ProductOffering
         LEARCredentialMachine.CredentialSubject.Mandate payloadMandate =
                 LEARCredentialMachine.CredentialSubject.Mandate.builder()
                         .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
@@ -1433,7 +1430,6 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
         LEARCredentialMachine machineCredential = getLEARCredentialMachineForEmployeeIssuance();
         when(learCredentialMachineFactory.mapStringToLEARCredentialMachine(vcClaim)).thenReturn(machineCredential);
 
-        // Admin path now requires payload powers validation
         LEARCredentialEmployee.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialEmployee.CredentialSubject.Mandate.builder()
                         .mandator(Mandator.builder()
@@ -1573,13 +1569,12 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_failure_whenPayloadHasEmptyPowers_forNonAdmin() throws Exception {
-        // Arrange: non-admin (different org) with empty powers in payload should fail
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
         LEARCredentialEmployee learCredential = getLEARCredentialEmployeeWithDifferentOrg();
 
-        // Payload with empty powers list
         LEARCredentialEmployee.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialEmployee.CredentialSubject.Mandate.builder()
                         .mandator(Mandator.builder()
@@ -1589,7 +1584,7 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
                                 .commonName(learCredential.credentialSubject().mandate().mandator().commonName())
                                 .email(learCredential.credentialSubject().mandate().mandator().email())
                                 .build())
-                        .power(Collections.emptyList())  // Empty powers
+                        .power(Collections.emptyList())
                         .build();
         when(objectMapper.convertValue(payload, LEARCredentialEmployee.CredentialSubject.Mandate.class))
                 .thenReturn(mandateFromPayload);
@@ -1624,19 +1619,18 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_failure_whenPayloadHasEmptyPowers_forAdmin() throws Exception {
-        // Arrange: admin with empty powers in payload should also fail
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
-        LEARCredentialEmployee learCredential = getLEARCredentialEmployee(); // Admin org
+        LEARCredentialEmployee learCredential = getLEARCredentialEmployee();
 
-        // Payload with empty powers list
         LEARCredentialEmployee.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialEmployee.CredentialSubject.Mandate.builder()
                         .mandator(Mandator.builder()
                                 .organizationIdentifier(ADMIN_ORG_ID)
                                 .build())
-                        .power(Collections.emptyList())  // Empty powers
+                        .power(Collections.emptyList())
                         .build();
         when(objectMapper.convertValue(payload, LEARCredentialEmployee.CredentialSubject.Mandate.class))
                 .thenReturn(mandateFromPayload);
@@ -1671,13 +1665,12 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_machine_failure_whenNonAdmin_withOnboardingPower() throws Exception {
-        // Arrange: non-admin should NOT be able to issue LEARCredentialMachine with Onboarding power
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
         LEARCredentialEmployee tokenCredential = getLEARCredentialEmployeeWithFullMandatorData();
 
-        // Payload mandate with Onboarding power (not allowed for non-admin)
         LEARCredentialMachine.CredentialSubject.Mandate payloadMandate =
                 LEARCredentialMachine.CredentialSubject.Mandate.builder()
                         .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
@@ -1736,13 +1729,12 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
     @ParameterizedTest(name = "{2}")
     @MethodSource("adminPowerTestCases")
     void authorize_machine_success_whenAdmin_withVariousPowers(String powerFunction, String powerAction, String testDescription) throws Exception {
-        // Arrange: admin should be able to issue LEARCredentialMachine with any power
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
-        LEARCredentialEmployee learCredential = getLEARCredentialEmployee(); // Admin org
+        LEARCredentialEmployee learCredential = getLEARCredentialEmployee();
 
-        // Payload with the specified power (allowed for admin)
         LEARCredentialMachine.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialMachine.CredentialSubject.Mandate.builder()
                         .mandator(LEARCredentialMachine.CredentialSubject.Mandate.Mandator.builder()
@@ -1783,13 +1775,12 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_employee_success_whenAdmin_withProductOfferingPower() throws Exception {
-        // Arrange: admin should be able to issue LEARCredentialEmployee with ProductOffering power
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
         LEARCredentialEmployee learCredential = getLEARCredentialEmployee(); // Admin org
 
-        // Payload with ProductOffering power (allowed for admin)
         LEARCredentialEmployee.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialEmployee.CredentialSubject.Mandate.builder()
                         .mandator(Mandator.builder()
@@ -1830,13 +1821,12 @@ class VerifiableCredentialPolicyAuthorizationServiceImplTest {
 
     @Test
     void authorize_employee_success_whenAdmin_withMixedAllowedPowers() throws Exception {
-        // Arrange: admin should be able to issue with multiple allowed powers
+        // Arrange
         String token = "valid-token";
         JsonNode payload = mock(JsonNode.class);
 
         LEARCredentialEmployee learCredential = getLEARCredentialEmployee(); // Admin org
 
-        // Payload with multiple allowed powers
         LEARCredentialEmployee.CredentialSubject.Mandate mandateFromPayload =
                 LEARCredentialEmployee.CredentialSubject.Mandate.builder()
                         .mandator(Mandator.builder()
