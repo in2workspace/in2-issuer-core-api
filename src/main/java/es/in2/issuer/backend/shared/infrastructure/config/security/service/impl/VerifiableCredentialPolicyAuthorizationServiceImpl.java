@@ -350,6 +350,6 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
     }
 
     private boolean payloadPowersOnlyIncludeProductOffering(List<Power> powers) {
-        return !powers.isEmpty() && powers.stream().allMatch(power -> "ProductOffering".equals(power.function()));
+        return powers != null && !powers.isEmpty() && powers.stream().allMatch(power -> "ProductOffering".equals(power.function()));
     }
 }
