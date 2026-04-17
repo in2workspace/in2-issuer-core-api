@@ -73,7 +73,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
             return Mono.error(new OperationNotSupportedException("operation_mode: " + preSubmittedCredentialDataRequest.operationMode() + " with schema: " + preSubmittedCredentialDataRequest.schema()));
         }
 
-        // Validate idToken header for VerifiableCertification schema
+        // Validate idToken header for Label Credential schema
         if (preSubmittedCredentialDataRequest.schema().equals(LABEL_CREDENTIAL) && idToken == null) {
             return Mono.error(new MissingIdTokenHeaderException("Missing required ID Token header for VerifiableCertification issuance."));
         }
