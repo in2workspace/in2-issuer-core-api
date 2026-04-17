@@ -180,10 +180,10 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
     }
 
     private Mono<Void> authorizeLabelCredential(LEARCredential learCredential, String idToken) {
-        return isVerifiableCertificationPolicyValid(learCredential, idToken)
+        return isLabelCredentialPolicyValid(learCredential, idToken)
                 .flatMap(valid -> Boolean.TRUE.equals(valid)
                         ? Mono.empty()
-                        : Mono.error(new InsufficientPermissionException("Unauthorized: VerifiableCertification does not meet the issuance policy.")));
+                        : Mono.error(new InsufficientPermissionException("Unauthorized: Label Credential does not meet the issuance policy.")));
     }
 
     private Mono<Void> authorizeLearCredentialMachine(LEARCredential learCredential, JsonNode payload) {
@@ -286,7 +286,7 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
         return a != null && a.equals(b);
     }
 
-    private Mono<Boolean> isVerifiableCertificationPolicyValid(LEARCredential learCredential, String idToken) {
+    private Mono<Boolean> isLabelCredentialPolicyValid(LEARCredential learCredential, String idToken) {
         boolean credentialValid = containsCertificationAndAttest(extractPowers(learCredential));
         return validateIdToken(idToken)
                 .map(learCredentialFromIdToken -> containsCertificationAndAttest(extractPowers(learCredentialFromIdToken)))
