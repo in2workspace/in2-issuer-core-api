@@ -11,7 +11,6 @@ import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.Mandator;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.Power;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.employee.LEARCredentialEmployee;
 import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.machine.LEARCredentialMachine;
-import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.machine.LEARCredentialMachine.CredentialSubject.Mandate;
 import es.in2.issuer.backend.shared.domain.service.JWTService;
 import es.in2.issuer.backend.shared.domain.service.VerifierService;
 import es.in2.issuer.backend.shared.domain.util.factory.CredentialFactory;
@@ -174,7 +173,7 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
 
     // It checks if the signer if Mandator is IN2 or if the credential has same organizationIdentifier as the Mandator of the credential.
     private Mono<Void> authorizeLearCredentialEmployee(LEARCredential learCredential, JsonNode payload) {
-        if (isSignerIssuancePolicyValid(learCredential) || isMandatorIssuancePolicyValid(learCredential, payload)) {
+        if (isSignerIssuancePolicyValid(learCredential, payload) || isMandatorIssuancePolicyValid(learCredential, payload)) {
             return Mono.empty();
         }
         return Mono.error(new InsufficientPermissionException("Unauthorized: LEARCredentialEmployee does not meet any issuance policies."));
@@ -188,7 +187,7 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
     }
 
     private Mono<Void> authorizeLearCredentialMachine(LEARCredential learCredential, JsonNode payload) {
-        if (isSignerIssuancePolicyValidLEARCredentialMachine(learCredential) || isMandatorIssuancePolicyValidLEARCredentialMachine(learCredential, payload)) {
+        if (isSignerIssuancePolicyValidLEARCredentialMachine(learCredential, payload) || isMandatorIssuancePolicyValidLEARCredentialMachine(learCredential, payload)) {
             return Mono.empty();
         }
         return Mono.error(new InsufficientPermissionException("Unauthorized: LEARCredentialMachine does not meet any issuance policies."));
@@ -208,17 +207,30 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
         }
     }
 
-    // Checks if signer is IN2 and has Onboarding/Execute power
-    private boolean isSignerIssuancePolicyValid(LEARCredential learCredential) {
-
+    // Checks if signer is from the admin org. and has Onboarding/Execute power, and validates payload has at least one power
+    private boolean isSignerIssuancePolicyValid(LEARCredential learCredential, JsonNode payload) {
         final String orgId = resolveMandatorOrgIdentifier(learCredential);
-        return appConfig.getAdminOrganizationId().equals(orgId)
-                && hasLearCredentialOnboardingExecutePower(extractPowers(learCredential));
+        if (!appConfig.getAdminOrganizationId().equals(orgId)
+                || !hasLearCredentialOnboardingExecutePower(extractPowers(learCredential))) {
+            return false;
+        }
+        // Admin - validate payload has at least one power (admin can add any power)
+        LEARCredentialEmployee.CredentialSubject.Mandate mandate =
+                objectMapper.convertValue(payload, LEARCredentialEmployee.CredentialSubject.Mandate.class);
+        return mandate != null && mandate.power() != null && !mandate.power().isEmpty();
     }
 
-    // For machine we reutilize the same logic
-    private boolean isSignerIssuancePolicyValidLEARCredentialMachine(LEARCredential learCredential) {
-        return isSignerIssuancePolicyValid(learCredential);
+    // For machine we use similar logic but with Machine mandate type
+    private boolean isSignerIssuancePolicyValidLEARCredentialMachine(LEARCredential learCredential, JsonNode payload) {
+        final String orgId = resolveMandatorOrgIdentifier(learCredential);
+        if (!appConfig.getAdminOrganizationId().equals(orgId)
+                || !hasLearCredentialOnboardingExecutePower(extractPowers(learCredential))) {
+            return false;
+        }
+        // Admin - validate payload has at least one power (admin can add any power)
+        LEARCredentialMachine.CredentialSubject.Mandate mandate =
+                objectMapper.convertValue(payload, LEARCredentialMachine.CredentialSubject.Mandate.class);
+        return mandate != null && mandate.power() != null && !mandate.power().isEmpty();
     }
 
     private boolean isMandatorIssuancePolicyValid(LEARCredential learCredential, JsonNode payload) {
@@ -267,7 +279,7 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
                 && equalsSafe(payloadMandator.country(), tokenMandator.country())
                 && equalsSafe(payloadMandator.commonName(), tokenMandator.commonName())
                 && equalsSafe(payloadMandator.serialNumber(), tokenMandator.serialNumber())
-                && payloadPowersOnlyIncludeOnboarding(mandate.power());
+                && payloadPowersOnlyIncludeProductOffering(mandate.power());
     }
 
     private boolean equalsSafe(String a, String b) {
@@ -338,10 +350,6 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
     }
 
     private boolean payloadPowersOnlyIncludeProductOffering(List<Power> powers) {
-        return powers.stream().allMatch(power -> "ProductOffering".equals(power.function()));
-    }
-
-    private boolean payloadPowersOnlyIncludeOnboarding(List<Power> powers) {
-        return powers.stream().allMatch(power -> "Onboarding".equals(power.function()));
+        return !powers.isEmpty() && powers.stream().allMatch(power -> "ProductOffering".equals(power.function()));
     }
 }
