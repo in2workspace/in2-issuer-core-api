@@ -275,74 +275,58 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     private Mono<Void> sendInitialFailureNotificationSafely(String email, String credentialId) {
-        Mono<Void> emailMono = Mono.empty();
-        if (email != null && !email.isBlank()) {
-            emailMono = emailService.sendResponseUriFailed(email, credentialId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
-                    .doOnSuccess(unused -> log.info("[NOTIFICATION] Failure email sent for credId: {}", credentialId))
-                    .onErrorResume(e -> {
-                        log.error("[NOTIFICATION] Failed to send failure email for credId: {}: {}", credentialId, e.getMessage());
-                        return Mono.empty();
-                    });
-        } else {
-            log.warn("[NOTIFICATION] No company email available for failure notification, credId: {}", credentialId);
-        }
-
-        Mono<Void> certifierEmailMono = sendFailureNotificationToConfiguredEmail(
-                appConfig.getLabelUploadCertifierEmail(), credentialId, "certifier"
+        return Mono.when(
+                sendFailureNotificationSafely(email, credentialId, "provider"),
+                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), credentialId, "certifier"),
+                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), credentialId, "marketplace")
         );
-
-        Mono<Void> marketplaceEmailMono = sendFailureNotificationToConfiguredEmail(
-                appConfig.getLabelUploadMarketplaceEmail(), credentialId, "marketplace"
-        );
-
-        return Mono.when(emailMono, certifierEmailMono, marketplaceEmailMono);
     }
 
-    private Mono<Void> sendFailureNotificationToConfiguredEmail(String email, String credentialId, String recipientType) {
+    private Mono<Void> sendFailureNotificationSafely(String email, String credentialId, String recipientType) {
         if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No {} email configured for failure notification, credId: {}", recipientType, credentialId);
+            log.warn("[NOTIFICATION] No {} email available for failure notification, credId: {}", recipientType, credentialId);
             return Mono.empty();
         }
 
-        return emailService.sendResponseUriFailed(email, credentialId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
-                .doOnSuccess(unused -> log.info("[NOTIFICATION] Failure email sent to {} for credId: {}", recipientType, credentialId))
+        return emailService.sendResponseUriFailed(
+                        email,
+                        credentialId,
+                        appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
+                )
+                .doOnSuccess(unused ->
+                        log.info("[NOTIFICATION] Failure email sent to {} for credId: {}", recipientType, credentialId)
+                )
                 .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send failure email to {} for credId: {}: {}", recipientType, credentialId, e.getMessage());
+                    log.error("[NOTIFICATION] Failed to send failure email to {} for credId: {}: {}",
+                            recipientType, credentialId, e.getMessage());
                     return Mono.empty();
                 });
     }
 
     private Mono<Void> sendExhaustionNotificationSafely(ProcedureRetry retryRecord) {
         return deserializePayload(retryRecord)
-                .flatMap(payload -> {
-                    Mono<Void> emailMono = Mono.empty();
-                    if (payload.email() != null && !payload.email().isBlank()) {
-                        emailMono = emailService.sendResponseUriExhausted(
+                .flatMap(payload ->
+                        Mono.when(
+                                sendExhaustionNotificationSafely(
                                         payload.email(),
                                         payload.credentialId(),
-                                        appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
+                                        retryRecord.getProcedureId(),
+                                        "provider"
+                                ),
+                                sendExhaustionNotificationSafely(
+                                        appConfig.getLabelUploadCertifierEmail(),
+                                        payload.credentialId(),
+                                        retryRecord.getProcedureId(),
+                                        "certifier"
+                                ),
+                                sendExhaustionNotificationSafely(
+                                        appConfig.getLabelUploadMarketplaceEmail(),
+                                        payload.credentialId(),
+                                        retryRecord.getProcedureId(),
+                                        "marketplace"
                                 )
-                                .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent to stored email for procedure: {}, credId: {}",
-                                        retryRecord.getProcedureId(), payload.credentialId()))
-                                .onErrorResume(e -> {
-                                    log.error("[NOTIFICATION] Failed to send exhaustion email to stored email for procedure: {}, credId: {}: {}",
-                                            retryRecord.getProcedureId(), payload.credentialId(), e.getMessage());
-                                    return Mono.empty();
-                                });
-                    } else {
-                        log.warn("[NOTIFICATION] No company email available for exhaustion notification, procedure: {}", retryRecord.getProcedureId());
-                    }
-
-                    Mono<Void> certifierEmailMono = sendExhaustionNotificationToConfiguredEmail(
-                            appConfig.getLabelUploadCertifierEmail(), payload.credentialId(), retryRecord.getProcedureId(), "certifier"
-                    );
-
-                    Mono<Void> marketplaceEmailMono = sendExhaustionNotificationToConfiguredEmail(
-                            appConfig.getLabelUploadMarketplaceEmail(), payload.credentialId(), retryRecord.getProcedureId(), "marketplace"
-                    );
-
-                    return Mono.when(emailMono, certifierEmailMono, marketplaceEmailMono);
-                })
+                        )
+                )
                 .onErrorResume(e -> {
                     log.error("[NOTIFICATION] Failed to deserialize payload for exhaustion notification, procedure: {}: {}",
                             retryRecord.getProcedureId(), e.getMessage());
@@ -350,9 +334,14 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 });
     }
 
-    private Mono<Void> sendExhaustionNotificationToConfiguredEmail(String email, String credentialId, UUID procedureId, String recipientType) {
+    private Mono<Void> sendExhaustionNotificationSafely(
+            String email,
+            String credentialId,
+            UUID procedureId,
+            String recipientType
+    ) {
         if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No {} email configured for exhaustion notification, procedure: {}", recipientType, procedureId);
+            log.warn("[NOTIFICATION] No {} email available for exhaustion notification, procedure: {}", recipientType, procedureId);
             return Mono.empty();
         }
 
