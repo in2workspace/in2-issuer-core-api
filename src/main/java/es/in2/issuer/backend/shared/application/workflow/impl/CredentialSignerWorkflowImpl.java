@@ -354,7 +354,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                     )))
                                                                     .flatMap(responseUri -> {
                                                                         try {
-                                                                            String companyEmail = updatedCredentialProcedure.getEmail();
+                                                                            String labelEmail = updatedCredentialProcedure.getEmail();
 
                                                                             return credentialProcedureService.getCredentialId(updatedCredentialProcedure)
                                                                                     .doOnNext(credentialId ->
@@ -365,7 +365,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                                                     responseUri,
                                                                                                     signedVc,
                                                                                                     credentialId,
-                                                                                                    companyEmail,
+                                                                                                    labelEmail,
                                                                                                     UUID.fromString(procedureId)
                                                                                             )
                                                                                     );
@@ -425,16 +425,16 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
      * If initial retries fail, creates a retry record for scheduler-based recovery.
      */
     private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
-                                                       String credentialId, String companyEmail, 
+                                                       String credentialId, String email, 
                                                        UUID procedureId) {
-        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
-            procedureId, responseUri, credentialId, companyEmail);
+        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} email={}",
+            procedureId, responseUri, credentialId, email);
 
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
             .responseUri(responseUri)
             .signedCredential(signedVc)
             .credentialId(credentialId)
-            .companyEmail(companyEmail)
+            .email(email)
             .build();
 
         // Execute delivery as fire-and-forget (completely parallel)

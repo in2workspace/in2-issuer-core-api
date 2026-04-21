@@ -167,7 +167,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                             .responseUri(responseUri)
                                             .signedCredential(signedCredential)
                                             .credentialId(credentialId)
-                                            .companyEmail(credentialProcedure.getEmail())
+                                            .email(credentialProcedure.getEmail())
                                             .build();
 
                                     // Execute delivery as fire-and-forget
@@ -529,7 +529,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                                         .responseUri(deferred.getResponseUri())
                                                         .signedCredential(encodedCredential)
                                                         .credentialId(credentialId)
-                                                        .companyEmail(credentialProcedure.getEmail())
+                                                        .email(credentialProcedure.getEmail())
                                                         .build();
                                                 
                                                 // Execute delivery as fire-and-forget (completely parallel)
