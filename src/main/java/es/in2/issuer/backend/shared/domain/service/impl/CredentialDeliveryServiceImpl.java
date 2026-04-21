@@ -26,7 +26,6 @@ public class CredentialDeliveryServiceImpl implements CredentialDeliveryService 
                 .encodedVc(encodedVc)
                 .build();
         log.debug("[RESPONSE-URI] Starting PATCH request to: {} for credId: {}", responseUri, credId);
-        log.debug("token: {}", bearerToken);
 
         return webClient.commonWebClient()
                 .patch()
