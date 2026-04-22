@@ -82,7 +82,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                             payload.credentialId(), e.getMessage());
 
                     return createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-                            .then(sendInitialFailureNotificationSafely(payload.email(), payload.credentialId()));
+                            .then(sendInitialFailureNotificationSafely(payload.credentialId()));
                 });
     }
 
@@ -274,9 +274,8 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 });
     }
 
-    private Mono<Void> sendInitialFailureNotificationSafely(String email, String credentialId) {
+    private Mono<Void> sendInitialFailureNotificationSafely(String credentialId) {
         return Mono.when(
-                sendFailureNotificationSafely(email, credentialId, "provider"),
                 sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), credentialId, "certifier"),
                 sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), credentialId, "marketplace")
         );
@@ -307,12 +306,6 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         return deserializePayload(retryRecord)
                 .flatMap(payload ->
                         Mono.when(
-                                sendExhaustionNotificationSafely(
-                                        payload.email(),
-                                        payload.credentialId(),
-                                        retryRecord.getProcedureId(),
-                                        "provider"
-                                ),
                                 sendExhaustionNotificationSafely(
                                         appConfig.getLabelUploadCertifierEmail(),
                                         payload.credentialId(),
