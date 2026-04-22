@@ -89,6 +89,7 @@ public class CustomAuthenticationManager implements ReactiveAuthenticationManage
 
     private Mono<String> getPrincipalFromAccessToken(Jwt accessJwt) {
         log.debug("Resolving principal from Access Token");
+        log.debug("Access Token claims: {}", accessJwt.getClaims());
         return Mono.fromSupplier(() -> jwtService.resolvePrincipal(accessJwt));
     }
 
