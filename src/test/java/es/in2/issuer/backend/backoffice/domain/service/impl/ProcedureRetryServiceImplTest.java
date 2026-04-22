@@ -790,13 +790,16 @@ class ProcedureRetryServiceImplTest {
         when(procedureRetryRepository.markAsExhausted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriExhausted(COMPANY_EMAIL, CREDENTIAL_ID, GUIDE_URL)).thenReturn(Mono.empty());
+        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
+        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
+        when(emailService.sendResponseUriExhausted(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.markRetryAsExhausted())
                 .verifyComplete();
 
         verify(procedureRetryRepository).markAsExhausted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
-        verify(emailService).sendResponseUriExhausted(COMPANY_EMAIL, CREDENTIAL_ID, GUIDE_URL);
+        verify(emailService).sendResponseUriExhausted(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, COMPANY_EMAIL, GUIDE_URL);
+        verify(emailService).sendResponseUriExhausted(MARKETPLACE_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, COMPANY_EMAIL, GUIDE_URL);
     }
 
     @Test
@@ -808,7 +811,9 @@ class ProcedureRetryServiceImplTest {
         when(procedureRetryRepository.markAsExhausted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(0));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriExhausted(any(), any(), any())).thenReturn(Mono.empty());
+        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
+        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
+        when(emailService.sendResponseUriExhausted(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.markRetryAsExhausted())
                 .verifyComplete();
@@ -841,7 +846,9 @@ class ProcedureRetryServiceImplTest {
         when(procedureRetryRepository.markAsExhausted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriExhausted(any(), any(), any()))
+        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
+        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
+        when(emailService.sendResponseUriExhausted(any(), any(), any(), any(), any()))
                 .thenReturn(Mono.error(new RuntimeException("SMTP unreachable")));
 
         StepVerifier.create(service.markRetryAsExhausted())
@@ -871,7 +878,9 @@ class ProcedureRetryServiceImplTest {
         when(procedureRetryRepository.markAsExhausted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriExhausted(any(), any(), any())).thenReturn(Mono.empty());
+        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
+        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
+        when(emailService.sendResponseUriExhausted(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.markRetryAsExhausted(Duration.ofDays(7)))
                 .verifyComplete();

@@ -126,11 +126,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                                 .flatMap(result -> {
                                     log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
                                     return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
-                                            .then(sendSuccessNotificationSafely(
-                                                    payload.email(),
-                                                    payload.credentialId(),
-                                                    result
-                                            ));
+                                            .then(sendScheduledSuccessNotifications(payload, result));
                                 })
                 )
                 .onErrorResume(e -> {
@@ -138,6 +134,14 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                             retryRecord.getProcedureId(), e.getMessage(), e);
                     return updateRetryAfterScheduledFailure(retryRecord);
                 });
+    }
+
+    private Mono<Void> sendScheduledSuccessNotifications(LabelCredentialDeliveryPayload payload, ResponseUriDeliveryResult result) {
+        return Mono.when(
+                sendSuccessNotificationSafely(payload.email(), payload.credentialId(), result),
+                sendSuccessNotificationSafely(appConfig.getLabelUploadCertifierEmail(), payload.credentialId(), result),
+                sendSuccessNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), payload.credentialId(), result)
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────
