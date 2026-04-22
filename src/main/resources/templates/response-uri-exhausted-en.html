@@ -81,8 +81,12 @@
   </div>
   <div class="content">
     <p>
-      <strong>All automatic retry attempts have been exhausted</strong> for the certification upload for the credential with ID:
-      <strong><span th:text="${productId}">PRODUCT ID</span></strong>
+      <strong>All automatic retry attempts have been exhausted</strong> for the certification upload.
+    </p>
+    <p>
+      <strong>Product Specification ID:</strong> <span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span><br/>
+      <strong>Credential ID:</strong> <span th:text="${credentialId}">CREDENTIAL ID</span><br/>
+      <strong>Owner email:</strong> <span th:text="${ownerEmail}">OWNER EMAIL</span>
     </p>
 
     <p>

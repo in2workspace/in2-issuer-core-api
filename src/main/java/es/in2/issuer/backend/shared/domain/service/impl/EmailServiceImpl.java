@@ -175,13 +175,15 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl) {
+    public Mono<Void> sendResponseUriExhausted(String to, String productSpecificationId, String credentialId, String ownerEmail, String guideUrl) {
         return sendTemplatedEmail(
                 to,
                 "email.retry-exhausted-submission",
                 "response-uri-exhausted",
                 context -> {
-                    context.setVariable(PRODUCT_ID, productId);
+                    context.setVariable("productSpecificationId", productSpecificationId);
+                    context.setVariable("credentialId", credentialId);
+                    context.setVariable("ownerEmail", ownerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
         );

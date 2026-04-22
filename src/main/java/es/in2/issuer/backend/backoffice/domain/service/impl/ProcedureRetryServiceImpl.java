@@ -309,13 +309,17 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                         Mono.when(
                                 sendExhaustionNotificationSafely(
                                         appConfig.getLabelUploadCertifierEmail(),
+                                        payload.productSpecificationId(),
                                         payload.credentialId(),
+                                        payload.email(),
                                         retryRecord.getProcedureId(),
                                         "certifier"
                                 ),
                                 sendExhaustionNotificationSafely(
                                         appConfig.getLabelUploadMarketplaceEmail(),
+                                        payload.productSpecificationId(),
                                         payload.credentialId(),
+                                        payload.email(),
                                         retryRecord.getProcedureId(),
                                         "marketplace"
                                 )
@@ -330,7 +334,9 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     private Mono<Void> sendExhaustionNotificationSafely(
             String email,
+            String productSpecificationId,
             String credentialId,
+            String ownerEmail,
             UUID procedureId,
             String recipientType
     ) {
@@ -339,12 +345,12 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
             return Mono.empty();
         }
 
-        return emailService.sendResponseUriExhausted(email, credentialId, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
-                .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent to {} for procedure: {}, credId: {}",
-                        recipientType, procedureId, credentialId))
+        return emailService.sendResponseUriExhausted(email, productSpecificationId, credentialId, ownerEmail, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
+                .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent to {} for procedure: {}, productSpecId: {}, credId: {}",
+                        recipientType, procedureId, productSpecificationId, credentialId))
                 .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send exhaustion email to {} for procedure: {}, credId: {}: {}",
-                            recipientType, procedureId, credentialId, e.getMessage());
+                    log.error("[NOTIFICATION] Failed to send exhaustion email to {} for procedure: {}, productSpecId: {}, credId: {}: {}",
+                            recipientType, procedureId, productSpecificationId, credentialId, e.getMessage());
                     return Mono.empty();
                 });
     }

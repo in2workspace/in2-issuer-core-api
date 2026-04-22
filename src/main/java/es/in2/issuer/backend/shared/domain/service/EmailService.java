@@ -9,7 +9,7 @@ public interface EmailService {
     Mono<Void> sendPendingCredentialNotification(String to, String subject);
     Mono<Void> sendCredentialSignedNotification(String to, String subject, String additionalInfo);
     Mono<Void> sendResponseUriFailed(String to, String productSpecificationId, String ownerEmail, String guideUrl);
-    Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl);
+    Mono<Void> sendResponseUriExhausted(String to, String productSpecificationId, String credentialId, String ownerEmail, String guideUrl);
     Mono<Void> sendCertificationUploaded(String to, String productId);
     Mono<Void> sendResponseUriAcceptedWithHtml(String to, String productId, String htmlContent);
     Mono<Void> sendPendingSignatureCredentialNotification(String to, String subject, String id, String domain);
