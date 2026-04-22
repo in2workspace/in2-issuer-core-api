@@ -133,16 +133,16 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
     @Override
     public Mono<String> getCredentialSubjectId(CredentialProcedure credentialProcedure) {
         return getCredentialNode(credentialProcedure)
-                .map(node -> {
+                .flatMap(node -> {
                     String productSpecId = node.path(VC).path(CREDENTIAL_SUBJECT).path(ID).asText(null);
 
                     if (productSpecId == null || productSpecId.isBlank()) {
                         productSpecId = node.path(CREDENTIAL_SUBJECT).path(ID).asText(null);
                     }
 
-                    return productSpecId;
+                    return Mono.justOrEmpty(productSpecId);
                 })
-                .filter(id -> id != null && !id.isBlank())
+                .filter(id -> !id.isBlank())
                 .defaultIfEmpty("");
     }
 
