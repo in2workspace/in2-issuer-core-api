@@ -530,7 +530,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                     }
 
                                     return Mono.zip(
-                                            credentialProcedureService.getCredentialId(credentialProcedure),
+                                            credentialProcedureService.getCredentialId(updatedCredentialProcedure),
                                             credentialProcedureService.getCredentialSubjectId(updatedCredentialProcedure)
                                     )
                                             .flatMap(idsTuple -> {
