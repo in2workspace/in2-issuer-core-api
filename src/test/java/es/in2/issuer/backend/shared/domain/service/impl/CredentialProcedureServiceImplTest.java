@@ -911,11 +911,9 @@ class CredentialProcedureServiceImplTest {
 
     @Test
     void getCredentialSubjectId_shouldReturnEmptyString_whenNoIdFound() throws Exception {
-        // Given (no id at either path - when vc.credentialSubject exists but has no id,
-        // and there's no top-level credentialSubject, the map returns null causing an error,
-        // but because we have defaultIfEmpty, it falls through after filter)
+        // Given
         String credentialDecoded = "{\"vc\":{\"credentialSubject\":{\"name\":\"test\"}},\"credentialSubject\":{}}";
-        
+
         CredentialProcedure credentialProcedure = new CredentialProcedure();
         credentialProcedure.setCredentialDecoded(credentialDecoded);
 
@@ -925,11 +923,10 @@ class CredentialProcedureServiceImplTest {
         // When
         Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
 
-        // Then - Note: when asText(null) returns null and map returns null, 
-        // Reactor throws NullPointerException. This is expected with current implementation.
+        // Then
         StepVerifier.create(result)
-                .expectErrorMatches(NullPointerException.class::isInstance)
-                .verify();
+                .expectNext("")
+                .verifyComplete();
     }
 
     @Test
