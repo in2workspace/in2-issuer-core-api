@@ -134,10 +134,8 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
     public Mono<String> getCredentialSubjectId(CredentialProcedure credentialProcedure) {
         return getCredentialNode(credentialProcedure)
                 .map(node -> {
-                    // Try vc.credentialSubject.id first
                     String productSpecId = node.path(VC).path(CREDENTIAL_SUBJECT).path(ID).asText(null);
 
-                    // Fallback to credentialSubject.id
                     if (productSpecId == null || productSpecId.isBlank()) {
                         productSpecId = node.path(CREDENTIAL_SUBJECT).path(ID).asText(null);
                     }

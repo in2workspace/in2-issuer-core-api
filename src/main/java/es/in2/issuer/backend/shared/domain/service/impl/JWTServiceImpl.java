@@ -335,7 +335,6 @@ public class JWTServiceImpl implements JWTService {
 
     /** Extract VC as a Map from either 'vc' or 'vc_json' (string). */
     private Map<String, Object> resolveVc(Map<String, Object> claims) {
-        log.info("claims: {}", claims);
         Object vcObj = claims.get("vc");
         if (vcObj instanceof Map<?, ?>) {
             return asMap(vcObj);
