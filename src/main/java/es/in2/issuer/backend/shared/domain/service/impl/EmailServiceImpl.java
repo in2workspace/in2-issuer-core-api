@@ -30,6 +30,8 @@ import java.util.function.Consumer;
 
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE;
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.UTF_8;
+import static es.in2.issuer.backend.shared.domain.util.Constants.CREDENTIAL_ID;
+import static es.in2.issuer.backend.shared.domain.util.Constants.PRODUCT_SPECIFICATION_ID;
 
 @Slf4j
 @Service
@@ -167,8 +169,8 @@ public class EmailServiceImpl implements EmailService {
                 "email.unsuccessful-submission",
                 "response-uri-failed",
                 context -> {
-                    context.setVariable("productSpecificationId", productSpecificationId);
-                    context.setVariable("credentialId", credentialId);
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
                     context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
@@ -182,8 +184,8 @@ public class EmailServiceImpl implements EmailService {
                 "email.retry-exhausted-submission",
                 "response-uri-exhausted",
                 context -> {
-                    context.setVariable("productSpecificationId", productSpecificationId);
-                    context.setVariable("credentialId", credentialId);
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
                     context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
@@ -197,8 +199,8 @@ public class EmailServiceImpl implements EmailService {
                 "email.certification-uploaded",
                 "certification-uploaded",
                 context -> {
-                    context.setVariable("productSpecificationId", productSpecificationId);
-                    context.setVariable("credentialId", credentialId);
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
                 }
         );
     }
@@ -283,7 +285,7 @@ public class EmailServiceImpl implements EmailService {
     private Context buildEmailContext(String organization, String credentialId, String type, String credentialStatus) {
         Context context = new Context();
         context.setVariable("organization", organization);
-        context.setVariable("credentialId", credentialId);
+        context.setVariable(CREDENTIAL_ID, credentialId);
         context.setVariable("type", type);
         context.setVariable("credentialStatus", credentialStatus);
         return context;
