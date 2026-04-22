@@ -215,9 +215,9 @@ cors:
 
 label-upload:
   # The email address of the certifier to notify on upload failures (REQUIRED)
-  certifier-email: "r.mir.min@gmail.com"
+  certifier-email:
   # The email address of the marketplace to notify on upload failures (REQUIRED)
-  marketplace-email: "roger.miret@altia.es"
+  marketplace-email:
 
 vault:
   hashicorp:
