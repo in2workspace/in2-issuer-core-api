@@ -82,7 +82,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                             payload.credentialId(), e.getMessage());
 
                     return createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-                            .then(sendInitialFailureNotificationSafely(payload.credentialId()));
+                            .then(sendInitialFailureNotificationSafely(payload.productSpecificationId(), payload.email()));
                 });
     }
 
@@ -274,30 +274,31 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 });
     }
 
-    private Mono<Void> sendInitialFailureNotificationSafely(String credentialId) {
+    private Mono<Void> sendInitialFailureNotificationSafely(String productSpecificationId, String ownerEmail) {
         return Mono.when(
-                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), credentialId, "certifier"),
-                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), credentialId, "marketplace")
+                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), productSpecificationId, ownerEmail, "certifier"),
+                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), productSpecificationId, ownerEmail, "marketplace")
         );
     }
 
-    private Mono<Void> sendFailureNotificationSafely(String email, String credentialId, String recipientType) {
+    private Mono<Void> sendFailureNotificationSafely(String email, String productSpecificationId, String ownerEmail, String recipientType) {
         if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No {} email available for failure notification, credId: {}", recipientType, credentialId);
+            log.warn("[NOTIFICATION] No {} email available for failure notification, productSpecId: {}", recipientType, productSpecificationId);
             return Mono.empty();
         }
 
         return emailService.sendResponseUriFailed(
                         email,
-                        credentialId,
+                        productSpecificationId,
+                        ownerEmail,
                         appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
                 )
                 .doOnSuccess(unused ->
-                        log.info("[NOTIFICATION] Failure email sent to {} for credId: {}", recipientType, credentialId)
+                        log.info("[NOTIFICATION] Failure email sent to {} for productSpecId: {}", recipientType, productSpecificationId)
                 )
                 .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send failure email to {} for credId: {}: {}",
-                            recipientType, credentialId, e.getMessage());
+                    log.error("[NOTIFICATION] Failed to send failure email to {} for productSpecId: {}: {}",
+                            recipientType, productSpecificationId, e.getMessage());
                     return Mono.empty();
                 });
     }

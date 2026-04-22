@@ -8,7 +8,7 @@ public interface EmailService {
     Mono<Void> sendCredentialActivationEmail(String to, String subject, String link, String knowledgebaseWalletUrl, String organization);
     Mono<Void> sendPendingCredentialNotification(String to, String subject);
     Mono<Void> sendCredentialSignedNotification(String to, String subject, String additionalInfo);
-    Mono<Void> sendResponseUriFailed(String to, String productId, String guideUrl);
+    Mono<Void> sendResponseUriFailed(String to, String productSpecificationId, String ownerEmail, String guideUrl);
     Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl);
     Mono<Void> sendCertificationUploaded(String to, String productId);
     Mono<Void> sendResponseUriAcceptedWithHtml(String to, String productId, String htmlContent);

@@ -55,12 +55,15 @@
   </div>
   <div class="content">
     <p>
-      No se pudo enviar la credencial con ID:
-      <span th:text="${productId}">PRODUCT ID</span>
+      No se pudo enviar la credencial para el Product Specification ID:
+      <strong><span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span></strong>
       para certificar el producto.
-      <br/>
-      Durante los próximos días, el sistema intentará añadir la certificación al producto. Le avisaremos cuando se complete el proceso.
-      <br/>
+    </p>
+    <p>
+      Email del propietario: <span th:text="${ownerEmail}">OWNER EMAIL</span>
+    </p>
+    <p>
+      Durante los próximos días, el sistema intentará añadir la certificación al producto.
     </p>
   </div>
   <div class="footer">

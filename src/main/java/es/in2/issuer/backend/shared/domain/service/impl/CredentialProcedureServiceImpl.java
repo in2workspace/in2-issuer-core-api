@@ -130,6 +130,24 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
                         "Missing credential id (expected vc.id or id)")));
     }
 
+    @Override
+    public Mono<String> getProductSpecificationId(CredentialProcedure credentialProcedure) {
+        return getCredentialNode(credentialProcedure)
+                .map(node -> {
+                    // Try vc.credentialSubject.id first
+                    String productSpecId = node.path(VC).path(CREDENTIAL_SUBJECT).path(ID).asText(null);
+
+                    // Fallback to credentialSubject.id
+                    if (productSpecId == null || productSpecId.isBlank()) {
+                        productSpecId = node.path(CREDENTIAL_SUBJECT).path(ID).asText(null);
+                    }
+
+                    return productSpecId;
+                })
+                .filter(id -> id != null && !id.isBlank())
+                .defaultIfEmpty("");
+    }
+
 
 
     private Optional<String> extractCredentialType(JsonNode typeNode) {

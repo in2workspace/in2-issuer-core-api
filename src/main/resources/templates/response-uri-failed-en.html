@@ -55,12 +55,15 @@
   </div>
   <div class="content">
     <p>
-      The credential with ID:
-      <span th:text="${productId}">PRODUCT ID</span>
+      The credential for Product Specification ID:
+      <strong><span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span></strong>
       could not be uploaded to certify the product.
-      <br/>
-      Over the next few days, the system will try to add the certification to the product. We will notify you once the process is complete.
-      <br/>
+    </p>
+    <p>
+      Owner email: <span th:text="${ownerEmail}">OWNER EMAIL</span>
+    </p>
+    <p>
+      Over the next few days, the system will try to add the certification to the product.
     </p>
   </div>
   <div class="footer">
