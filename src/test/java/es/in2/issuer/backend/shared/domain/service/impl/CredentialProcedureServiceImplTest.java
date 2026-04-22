@@ -24,6 +24,11 @@ import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
+
+import java.util.stream.Stream;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -32,8 +37,8 @@ import java.util.UUID;
 
 import static org.hibernate.validator.internal.util.Contracts.assertNotNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -865,12 +870,13 @@ class CredentialProcedureServiceImplTest {
 
     // ---------- getCredentialSubjectId tests ----------
 
-    @Test
-    void getCredentialSubjectId_shouldReturnId_fromVcCredentialSubjectIdPath() throws Exception {
+        @ParameterizedTest
+        @MethodSource("credentialSubjectIdSuccessCases")
+        void getCredentialSubjectId_shouldReturnId_fromSupportedPaths(
+                String credentialDecoded,
+                String expectedId
+        ) throws Exception {
         // Given
-        String expectedId = "subject-id-123";
-        String credentialDecoded = "{\"vc\":{\"credentialSubject\":{\"id\":\"" + expectedId + "\"}}}";
-        
         CredentialProcedure credentialProcedure = new CredentialProcedure();
         credentialProcedure.setCredentialDecoded(credentialDecoded);
 
@@ -884,49 +890,24 @@ class CredentialProcedureServiceImplTest {
         StepVerifier.create(result)
                 .expectNext(expectedId)
                 .verifyComplete();
-    }
+        }
 
-    @Test
-    void getCredentialSubjectId_shouldReturnId_fromCredentialSubjectIdPath_whenVcPathIsEmpty() throws Exception {
-        // Given (credential without vc wrapper - fallback path)
-        String expectedId = "fallback-subject-id-456";
-        String credentialDecoded = "{\"credentialSubject\":{\"id\":\"" + expectedId + "\"}}";
-        
-        CredentialProcedure credentialProcedure = new CredentialProcedure();
-        credentialProcedure.setCredentialDecoded(credentialDecoded);
-
-        JsonNode credentialNode = new ObjectMapper().readTree(credentialDecoded);
-        when(objectMapper.readTree(credentialDecoded)).thenReturn(credentialNode);
-
-        // When
-        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
-
-        // Then
-        StepVerifier.create(result)
-                .expectNext(expectedId)
-                .verifyComplete();
-    }
-
-    @Test
-    void getCredentialSubjectId_shouldReturnId_fromFallbackPath_whenVcCredentialSubjectIdIsBlank() throws Exception {
-        // Given (vc.credentialSubject.id is blank, but credentialSubject.id has value)
-        String expectedId = "root-level-id";
-        String credentialDecoded = "{\"vc\":{\"credentialSubject\":{\"id\":\"\"}},\"credentialSubject\":{\"id\":\"" + expectedId + "\"}}";
-        
-        CredentialProcedure credentialProcedure = new CredentialProcedure();
-        credentialProcedure.setCredentialDecoded(credentialDecoded);
-
-        JsonNode credentialNode = new ObjectMapper().readTree(credentialDecoded);
-        when(objectMapper.readTree(credentialDecoded)).thenReturn(credentialNode);
-
-        // When
-        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
-
-        // Then
-        StepVerifier.create(result)
-                .expectNext(expectedId)
-                .verifyComplete();
-    }
+        private static Stream<Arguments> credentialSubjectIdSuccessCases() {
+        return Stream.of(
+                Arguments.of(
+                        "{\"vc\":{\"credentialSubject\":{\"id\":\"subject-id-123\"}}}",
+                        "subject-id-123"
+                ),
+                Arguments.of(
+                        "{\"credentialSubject\":{\"id\":\"fallback-subject-id-456\"}}",
+                        "fallback-subject-id-456"
+                ),
+                Arguments.of(
+                        "{\"vc\":{\"credentialSubject\":{\"id\":\"\"}},\"credentialSubject\":{\"id\":\"root-level-id\"}}",
+                        "root-level-id"
+                )
+        );
+        }
 
     @Test
     void getCredentialSubjectId_shouldReturnEmptyString_whenNoIdFound() throws Exception {
@@ -947,7 +928,7 @@ class CredentialProcedureServiceImplTest {
         // Then - Note: when asText(null) returns null and map returns null, 
         // Reactor throws NullPointerException. This is expected with current implementation.
         StepVerifier.create(result)
-                .expectErrorMatches(throwable -> throwable instanceof NullPointerException)
+                .expectErrorMatches(NullPointerException.class::isInstance)
                 .verify();
     }
 
