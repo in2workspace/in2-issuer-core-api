@@ -191,7 +191,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
@@ -199,8 +199,8 @@ class ProcedureRetryServiceImplTest {
         // Delivery attempted exactly once (400 is not retryable)
         verify(credentialDeliveryService, times(1)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(procedureRetryRepository).upsert(any());
-        verify(emailService).sendResponseUriFailed(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, COMPANY_EMAIL, GUIDE_URL);
-        verify(emailService).sendResponseUriFailed(MARKETPLACE_EMAIL, PRODUCT_SPECIFICATION_ID, COMPANY_EMAIL, GUIDE_URL);
+        verify(emailService).sendResponseUriFailed(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, COMPANY_EMAIL, GUIDE_URL);
+        verify(emailService).sendResponseUriFailed(MARKETPLACE_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, COMPANY_EMAIL, GUIDE_URL);
     }
 
     @Test
@@ -216,14 +216,14 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload))
                 .verifyComplete();
 
-        verify(emailService).sendResponseUriFailed(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, null, GUIDE_URL);
-        verify(emailService).sendResponseUriFailed(MARKETPLACE_EMAIL, PRODUCT_SPECIFICATION_ID, null, GUIDE_URL);
-        verify(emailService, times(2)).sendResponseUriFailed(any(), any(), any(), any());
+        verify(emailService).sendResponseUriFailed(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, null, GUIDE_URL);
+        verify(emailService).sendResponseUriFailed(MARKETPLACE_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, null, GUIDE_URL);
+        verify(emailService, times(2)).sendResponseUriFailed(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -253,7 +253,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -280,7 +280,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(
                         service.handleInitialAction(
@@ -294,7 +294,7 @@ class ProcedureRetryServiceImplTest {
         verify(m2mTokenService, times(1)).getM2MToken();
         verify(credentialDeliveryService, times(1)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(procedureRetryRepository, times(1)).upsert(any());
-        verify(emailService, times(3)).sendResponseUriFailed(any(), any(), any(), any());
+        verify(emailService, times(3)).sendResponseUriFailed(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -309,7 +309,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(
                         service.handleInitialAction(
@@ -323,7 +323,7 @@ class ProcedureRetryServiceImplTest {
         verify(m2mTokenService, times(1)).getM2MToken();
         verify(credentialDeliveryService, times(1)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(procedureRetryRepository, times(1)).upsert(any());
-        verify(emailService, times(3)).sendResponseUriFailed(any(), any(), any(), any());
+        verify(emailService, times(3)).sendResponseUriFailed(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -336,7 +336,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -357,7 +357,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -378,7 +378,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -399,7 +399,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -421,7 +421,7 @@ class ProcedureRetryServiceImplTest {
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
         when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
         when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -440,7 +440,7 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.error(ex));
         when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -459,7 +459,7 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.error(ex));
         when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
@@ -475,7 +475,7 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.error(ex));
         when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
         when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any())).thenReturn(Mono.empty());
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();

@@ -161,21 +161,22 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public Mono<Void> sendResponseUriFailed(String to, String productSpecificationId, String ownerEmail, String guideUrl) {
+    public Mono<Void> sendResponseUriFailed(String to, String productSpecificationId, String credentialId, String providerEmail, String guideUrl) {
         return sendTemplatedEmail(
                 to,
                 "email.unsuccessful-submission",
                 "response-uri-failed",
                 context -> {
                     context.setVariable("productSpecificationId", productSpecificationId);
-                    context.setVariable("ownerEmail", ownerEmail);
+                    context.setVariable("credentialId", credentialId);
+                    context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
         );
     }
 
     @Override
-    public Mono<Void> sendResponseUriExhausted(String to, String productSpecificationId, String credentialId, String ownerEmail, String guideUrl) {
+    public Mono<Void> sendResponseUriExhausted(String to, String productSpecificationId, String credentialId, String providerEmail, String guideUrl) {
         return sendTemplatedEmail(
                 to,
                 "email.retry-exhausted-submission",
@@ -183,7 +184,7 @@ public class EmailServiceImpl implements EmailService {
                 context -> {
                     context.setVariable("productSpecificationId", productSpecificationId);
                     context.setVariable("credentialId", credentialId);
-                    context.setVariable("ownerEmail", ownerEmail);
+                    context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
         );

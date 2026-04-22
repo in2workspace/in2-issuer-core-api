@@ -82,7 +82,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                             payload.credentialId(), e.getMessage());
 
                     return createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-                            .then(sendInitialFailureNotificationSafely(payload.productSpecificationId(), payload.email()));
+                            .then(sendInitialFailureNotificationSafely(payload.productSpecificationId(), payload.credentialId(), payload.email()));
                 });
     }
 
@@ -278,14 +278,14 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 });
     }
 
-    private Mono<Void> sendInitialFailureNotificationSafely(String productSpecificationId, String ownerEmail) {
+    private Mono<Void> sendInitialFailureNotificationSafely(String productSpecificationId, String credentialId, String providerEmail) {
         return Mono.when(
-                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), productSpecificationId, ownerEmail, "certifier"),
-                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), productSpecificationId, ownerEmail, "marketplace")
+                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), productSpecificationId, credentialId, providerEmail, "certifier"),
+                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), productSpecificationId, credentialId, providerEmail, "marketplace")
         );
     }
 
-    private Mono<Void> sendFailureNotificationSafely(String email, String productSpecificationId, String ownerEmail, String recipientType) {
+    private Mono<Void> sendFailureNotificationSafely(String email, String productSpecificationId, String credentialId, String providerEmail, String recipientType) {
         if (email == null || email.isBlank()) {
             log.warn("[NOTIFICATION] No {} email available for failure notification, productSpecId: {}", recipientType, productSpecificationId);
             return Mono.empty();
@@ -294,15 +294,16 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         return emailService.sendResponseUriFailed(
                         email,
                         productSpecificationId,
-                        ownerEmail,
+                        credentialId,
+                        providerEmail,
                         appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
                 )
                 .doOnSuccess(unused ->
-                        log.info("[NOTIFICATION] Failure email sent to {} for productSpecId: {}", recipientType, productSpecificationId)
+                        log.info("[NOTIFICATION] Failure email sent to {} for productSpecId: {}, credId: {}", recipientType, productSpecificationId, credentialId)
                 )
                 .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send failure email to {} for productSpecId: {}: {}",
-                            recipientType, productSpecificationId, e.getMessage());
+                    log.error("[NOTIFICATION] Failed to send failure email to {} for productSpecId: {}, credId: {}: {}",
+                            recipientType, productSpecificationId, credentialId, e.getMessage());
                     return Mono.empty();
                 });
     }
@@ -340,7 +341,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
             String email,
             String productSpecificationId,
             String credentialId,
-            String ownerEmail,
+            String providerEmail,
             UUID procedureId,
             String recipientType
     ) {
@@ -349,7 +350,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
             return Mono.empty();
         }
 
-        return emailService.sendResponseUriExhausted(email, productSpecificationId, credentialId, ownerEmail, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
+        return emailService.sendResponseUriExhausted(email, productSpecificationId, credentialId, providerEmail, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
                 .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent to {} for procedure: {}, productSpecId: {}, credId: {}",
                         recipientType, procedureId, productSpecificationId, credentialId))
                 .onErrorResume(e -> {
