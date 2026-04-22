@@ -122,7 +122,7 @@ class ProcedureRetryServiceImplTest {
                 .verifyComplete();
 
         verify(emailService).sendResponseUriAcceptedWithHtml(COMPANY_EMAIL, CREDENTIAL_ID, "<html/>");
-        verify(emailService, never()).sendCertificationUploaded(any(), any());
+        verify(emailService, never()).sendCertificationUploaded(any(), any(), any());
     }
 
     @Test
@@ -130,12 +130,12 @@ class ProcedureRetryServiceImplTest {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(RESPONSE_URI, SIGNED_CREDENTIAL, CREDENTIAL_ID, "m2m-token"))
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
-        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID)).thenReturn(Mono.empty());
+        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
 
-        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID);
+        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID);
         verify(emailService, never()).sendResponseUriAcceptedWithHtml(any(), any(), any());
     }
 
@@ -174,7 +174,7 @@ class ProcedureRetryServiceImplTest {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
-        when(emailService.sendCertificationUploaded(any(), any()))
+        when(emailService.sendCertificationUploaded(any(), any(), any()))
                 .thenReturn(Mono.error(new RuntimeException("SMTP unavailable")));
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -491,7 +491,7 @@ class ProcedureRetryServiceImplTest {
                         Mono.error(WebClientResponseException.create(500, "Server Error", null, null, null)),
                         Mono.just(ResponseUriDeliveryResult.success())
                 );
-        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID)).thenReturn(Mono.empty());
+        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID)).thenReturn(Mono.empty());
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -500,7 +500,7 @@ class ProcedureRetryServiceImplTest {
                 .verifyComplete();
 
         verify(credentialDeliveryService, times(2)).deliverLabelToResponseUri(any(), any(), any(), any());
-        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID);
+        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID);
         verify(procedureRetryRepository, never()).upsert(any());
     }
 
@@ -529,13 +529,13 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
         when(procedureRetryRepository.markAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
-        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID)).thenReturn(Mono.empty());
+        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.processPendingRetries())
                 .verifyComplete();
 
         verify(procedureRetryRepository).markAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
-        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID);
+        verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID);
         verify(procedureRetryRepository, never()).incrementAttemptCount(any(), any(), any());
     }
 
@@ -624,7 +624,7 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
         when(procedureRetryRepository.markAsCompleted(otherProcedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
-        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID)).thenReturn(Mono.empty());
+        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.processPendingRetries())
                 .verifyComplete();
@@ -734,7 +734,7 @@ class ProcedureRetryServiceImplTest {
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
         when(procedureRetryRepository.markAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(1));
-        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, CREDENTIAL_ID)).thenReturn(Mono.empty());
+        when(emailService.sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID)).thenReturn(Mono.empty());
 
         StepVerifier.create(service.retryAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .verifyComplete();

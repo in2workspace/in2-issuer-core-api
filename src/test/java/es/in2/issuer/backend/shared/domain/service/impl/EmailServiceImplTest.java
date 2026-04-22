@@ -158,7 +158,7 @@ class EmailServiceImplTest {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("certification-uploaded-en"), any(Context.class))).thenReturn("htmlContent");
 
-        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productSpecId", "credentialId"))
                 .verifyComplete();
 
         verify(javaMailSender).send(mimeMessage);
@@ -168,7 +168,7 @@ class EmailServiceImplTest {
     void sendCertificationUploaded_handlesException(){
         when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
 
-        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productSpecId", "credentialId"))
                 .expectError(RuntimeException.class) // service does not map this one
                 .verify();
     }

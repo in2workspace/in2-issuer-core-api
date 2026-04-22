@@ -191,12 +191,15 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public Mono<Void> sendCertificationUploaded(String to, String productId) {
+    public Mono<Void> sendCertificationUploaded(String to, String productSpecificationId, String credentialId) {
         return sendTemplatedEmail(
                 to,
                 "email.certification-uploaded",
                 "certification-uploaded",
-                context -> context.setVariable(PRODUCT_ID, productId)
+                context -> {
+                    context.setVariable("productSpecificationId", productSpecificationId);
+                    context.setVariable("credentialId", credentialId);
+                }
         );
     }
 

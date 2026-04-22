@@ -75,7 +75,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         return deliverLabelWithImmediateRetries(payload)
                 .flatMap(result -> {
                     log.info("[DELIVERY] Initial delivery succeeded for credId: {}", payload.credentialId());
-                    return sendSuccessNotificationSafely(payload.email(), payload.credentialId(), result);
+                    return sendSuccessNotificationSafely(payload.email(), payload.productSpecificationId(), payload.credentialId(), result);
                 })
                 .onErrorResume(e -> {
                     log.error("[DELIVERY] Initial delivery failed after all retries for credId: {} - {}",
@@ -138,9 +138,9 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     private Mono<Void> sendScheduledSuccessNotifications(LabelCredentialDeliveryPayload payload, ResponseUriDeliveryResult result) {
         return Mono.when(
-                sendSuccessNotificationSafely(payload.email(), payload.credentialId(), result),
-                sendSuccessNotificationSafely(appConfig.getLabelUploadCertifierEmail(), payload.credentialId(), result),
-                sendSuccessNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), payload.credentialId(), result)
+                sendSuccessNotificationSafely(payload.email(), payload.productSpecificationId(), payload.credentialId(), result),
+                sendSuccessNotificationSafely(appConfig.getLabelUploadCertifierEmail(), payload.productSpecificationId(), payload.credentialId(), result),
+                sendSuccessNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), payload.productSpecificationId(), payload.credentialId(), result)
         );
     }
 
@@ -257,7 +257,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // Non-blocking email notifications
     // ──────────────────────────────────────────────────────────────────────
 
-    private Mono<Void> sendSuccessNotificationSafely(String email, String credentialId, ResponseUriDeliveryResult result) {
+    private Mono<Void> sendSuccessNotificationSafely(String email, String productSpecificationId, String credentialId, ResponseUriDeliveryResult result) {
         if (email == null || email.isBlank()) {
             log.warn("[NOTIFICATION] No email available for success notification, credId: {}", credentialId);
             return Mono.empty();
@@ -267,7 +267,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         if (result.acceptedWithHtml() && result.html() != null) {
             emailMono = emailService.sendResponseUriAcceptedWithHtml(email, credentialId, result.html());
         } else {
-            emailMono = emailService.sendCertificationUploaded(email, credentialId);
+            emailMono = emailService.sendCertificationUploaded(email, productSpecificationId, credentialId);
         }
 
         return emailMono
