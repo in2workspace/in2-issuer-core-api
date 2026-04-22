@@ -163,7 +163,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                 .flatMap(responseUri ->
                         Mono.zip(
                                 credentialProcedureService.getCredentialId(credentialProcedure),
-                                credentialProcedureService.getProductSpecificationId(credentialProcedure)
+                                credentialProcedureService.getCredentialSubjectId(credentialProcedure)
                         )
                                 .flatMap(tuple -> {
                                     String credentialId = tuple.getT1();
@@ -531,7 +531,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
 
                                     return Mono.zip(
                                             credentialProcedureService.getCredentialId(credentialProcedure),
-                                            credentialProcedureService.getProductSpecificationId(updatedCredentialProcedure)
+                                            credentialProcedureService.getCredentialSubjectId(updatedCredentialProcedure)
                                     )
                                             .flatMap(idsTuple -> {
                                                 String credentialId = idsTuple.getT1();

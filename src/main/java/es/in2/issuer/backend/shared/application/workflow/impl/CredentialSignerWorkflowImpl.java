@@ -358,7 +358,7 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
 
                                                                             return Mono.zip(
                                                                                     credentialProcedureService.getCredentialId(updatedCredentialProcedure),
-                                                                                    credentialProcedureService.getProductSpecificationId(updatedCredentialProcedure)
+                                                                                    credentialProcedureService.getCredentialSubjectId(updatedCredentialProcedure)
                                                                             )
                                                                                     .doOnNext(tuple ->
                                                                                             log.debug("Using credentialId for delivery: {}", tuple.getT1())

@@ -131,7 +131,7 @@ public class CredentialProcedureServiceImpl implements CredentialProcedureServic
     }
 
     @Override
-    public Mono<String> getProductSpecificationId(CredentialProcedure credentialProcedure) {
+    public Mono<String> getCredentialSubjectId(CredentialProcedure credentialProcedure) {
         return getCredentialNode(credentialProcedure)
                 .map(node -> {
                     // Try vc.credentialSubject.id first

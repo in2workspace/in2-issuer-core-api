@@ -792,7 +792,7 @@ class CredentialSignerWorkflowImplTest {
         when(credentialProcedureService.getCredentialId(updatedProcedure)).thenReturn(Mono.just("cred-id-123"));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
-        when(credentialProcedureService.getProductSpecificationId(updatedProcedure))
+        when(credentialProcedureService.getCredentialSubjectId(updatedProcedure))
                 .thenReturn(Mono.just("product-spec-123"));
 
         StepVerifier.create(credentialSignerWorkflow.retrySignUnsignedCredential(processId, authorizationHeader, procedureId))
@@ -815,7 +815,7 @@ class CredentialSignerWorkflowImplTest {
         CredentialProcedure updatedProcedure = mock(CredentialProcedure.class);
         when(updatedProcedure.getCredentialType()).thenReturn(LABEL_CREDENTIAL_TYPE);
         when(updatedProcedure.getEmail()).thenReturn("company@example.com");
-        when(credentialProcedureService.getProductSpecificationId(updatedProcedure))
+        when(credentialProcedureService.getCredentialSubjectId(updatedProcedure))
                 .thenReturn(Mono.just("product-spec-123"));
 
         when(accessTokenService.getCleanBearerToken(authorizationHeader)).thenReturn(Mono.just(token));
@@ -899,7 +899,7 @@ class CredentialSignerWorkflowImplTest {
         when(credentialProcedureService.getCredentialId(updatedProcedure)).thenReturn(Mono.just("cred-id-123"));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
-        when(credentialProcedureService.getProductSpecificationId(updatedProcedure))
+        when(credentialProcedureService.getCredentialSubjectId(updatedProcedure))
                 .thenReturn(Mono.just("product-spec-123"));
         StepVerifier.create(credentialSignerWorkflow.retrySignUnsignedCredential(processId, authorizationHeader, procedureId))
                 .verifyComplete();

@@ -48,5 +48,5 @@ public interface CredentialProcedureService {
     Mono<Void> updateFormatByProcedureId(String procedureId, String format);
     Mono<CredentialOfferEmailNotificationInfo> getCredentialOfferEmailInfoByProcedureId(String procedureId);
     Mono<Void> updateCredentialStatusToPendSignature(String procedureId);
-    Mono<String> getProductSpecificationId(CredentialProcedure credentialProcedure);
+    Mono<String> getCredentialSubjectId(CredentialProcedure credentialProcedure);
 }

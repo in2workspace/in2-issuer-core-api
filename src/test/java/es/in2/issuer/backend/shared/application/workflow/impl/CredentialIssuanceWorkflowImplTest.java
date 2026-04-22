@@ -232,7 +232,7 @@ class CredentialIssuanceWorkflowImplTest {
         when(credentialProcedureService.getDecodedCredentialByProcedureId(PROCEDURE_ID))
                 .thenReturn(Mono.just("decoded-credential"));
         when(credentialProcedureService.getCredentialId(proc)).thenReturn(Mono.just("cred-id-123"));
-        when(credentialProcedureService.getProductSpecificationId(proc)).thenReturn(Mono.just("product-spec-123"));
+        when(credentialProcedureService.getCredentialSubjectId(proc)).thenReturn(Mono.just("product-spec-123"));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
 
@@ -241,7 +241,7 @@ class CredentialIssuanceWorkflowImplTest {
                 .verifyComplete();
 
         verify(credentialProcedureService).getCredentialId(proc);
-        verify(credentialProcedureService).getProductSpecificationId(proc);
+        verify(credentialProcedureService).getCredentialSubjectId(proc);
         verify(procedureRetryService).handleInitialAction(
                 eq(UUID.fromString(PROCEDURE_ID)),
                 eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI),
@@ -391,7 +391,7 @@ class CredentialIssuanceWorkflowImplTest {
                 .thenReturn(Mono.just(responseUri));
         when(credentialProcedureService.getCredentialId(proc))
                 .thenReturn(Mono.just(credentialId));
-        when(credentialProcedureService.getProductSpecificationId(proc))
+        when(credentialProcedureService.getCredentialSubjectId(proc))
                 .thenReturn(Mono.just(productSpecificationId));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
@@ -401,7 +401,7 @@ class CredentialIssuanceWorkflowImplTest {
 
         verify(credentialSignerWorkflow).signAndUpdateCredentialByProcedureId("token", PROCEDURE_ID, JWT_VC);
         verify(credentialProcedureService).updateCredentialProcedureCredentialStatusToValidByProcedureId(PROCEDURE_ID);
-        verify(credentialProcedureService).getProductSpecificationId(proc);
+        verify(credentialProcedureService).getCredentialSubjectId(proc);
         verify(procedureRetryService).handleInitialAction(
                 eq(UUID.fromString(PROCEDURE_ID)),
                 eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI),
