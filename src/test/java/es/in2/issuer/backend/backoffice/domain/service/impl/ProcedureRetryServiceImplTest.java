@@ -1,10 +1,11 @@
 package es.in2.issuer.backend.backoffice.domain.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import es.in2.issuer.backend.shared.domain.exception.ProcedureRetryRecordNotFoundException;
+import es.in2.issuer.backend.backoffice.infrastructure.repository.ProcedureRetryRepository;
 import es.in2.issuer.backend.shared.domain.exception.InvalidRetryStatusException;
-import es.in2.issuer.backend.shared.domain.exception.RetryPayloadException;
+import es.in2.issuer.backend.shared.domain.exception.ProcedureRetryRecordNotFoundException;
 import es.in2.issuer.backend.shared.domain.exception.ResponseUriDeliveryException;
+import es.in2.issuer.backend.shared.domain.exception.RetryPayloadException;
 import es.in2.issuer.backend.shared.domain.model.dto.ResponseUriDeliveryResult;
 import es.in2.issuer.backend.shared.domain.model.dto.VerifierOauth2AccessToken;
 import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
@@ -15,9 +16,12 @@ import es.in2.issuer.backend.shared.domain.service.CredentialDeliveryService;
 import es.in2.issuer.backend.shared.domain.service.EmailService;
 import es.in2.issuer.backend.shared.domain.service.M2MTokenService;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
-import es.in2.issuer.backend.backoffice.infrastructure.repository.ProcedureRetryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -37,6 +41,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,10 +71,6 @@ class ProcedureRetryServiceImplTest {
 
     @InjectMocks
     private ProcedureRetryServiceImpl service;
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Test fixtures
-    // ──────────────────────────────────────────────────────────────────────
 
     private static final UUID PROCEDURE_ID = UUID.fromString("d290f1ee-6c54-4b01-90e6-d701748f0851");
     private static final String RESPONSE_URI = "https://example.com/response";
@@ -105,9 +106,36 @@ class ProcedureRetryServiceImplTest {
                 .build();
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // handleInitialAction
-    // ──────────────────────────────────────────────────────────────────────
+    private void mockFailureNotificationDependencies() {
+        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
+        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
+        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
+        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
+        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+    }
+
+    private static Stream<WebClientResponseException> nonRetryableUnauthorizedOrForbiddenErrors() {
+        return Stream.of(
+                WebClientResponseException.create(401, "Unauthorized", null, null, null),
+                WebClientResponseException.create(403, "Forbidden", null, null, null)
+        );
+    }
+
+    private static Stream<Throwable> retryableErrorsWithVirtualTime() {
+        return Stream.of(
+                WebClientResponseException.create(408, "Request Timeout", null, null, null),
+                WebClientResponseException.create(429, "Too Many Requests", null, null, null),
+                new ConnectException("Connection refused"),
+                new TimeoutException("Timed out"),
+                new WebClientRequestException(
+                        new IOException("Network error"),
+                        HttpMethod.POST,
+                        URI.create(RESPONSE_URI),
+                        new HttpHeaders()
+                ),
+                new ResponseUriDeliveryException("Service unavailable", 503, RESPONSE_URI, CREDENTIAL_ID)
+        );
+    }
 
     @Test
     void handleInitialAction_deliverySucceeds_withHtmlResponse_sendsHtmlEmail() {
@@ -139,26 +167,17 @@ class ProcedureRetryServiceImplTest {
         verify(emailService, never()).sendResponseUriAcceptedWithHtml(any(), any(), any());
     }
 
-    @Test
-    void handleInitialAction_deliverySucceeds_nullEmail_noEmailSent() {
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void handleInitialAction_deliverySucceeds_invalidEmail_noEmailSent(String email) {
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(RESPONSE_URI).signedCredential(SIGNED_CREDENTIAL)
-                .credentialId(CREDENTIAL_ID).email(null).build();
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
+                .responseUri(RESPONSE_URI)
+                .signedCredential(SIGNED_CREDENTIAL)
+                .credentialId(CREDENTIAL_ID)
+                .email(email)
+                .build();
 
-        StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload))
-                .verifyComplete();
-
-        verifyNoInteractions(emailService);
-    }
-
-    @Test
-    void handleInitialAction_deliverySucceeds_blankEmail_noEmailSent() {
-        LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(RESPONSE_URI).signedCredential(SIGNED_CREDENTIAL)
-                .credentialId(CREDENTIAL_ID).email("   ").build();
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
@@ -187,16 +206,11 @@ class ProcedureRetryServiceImplTest {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.error(badRequest));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+        mockFailureNotificationDependencies();
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
 
-        // Delivery attempted exactly once (400 is not retryable)
         verify(credentialDeliveryService, times(1)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(procedureRetryRepository).upsert(any());
         verify(emailService).sendResponseUriFailed(CERTIFIER_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID, COMPANY_EMAIL, GUIDE_URL);
@@ -206,17 +220,18 @@ class ProcedureRetryServiceImplTest {
     @Test
     void handleInitialAction_nonRetryableError_nullEmail_sendsFailureEmailToConfiguredAddressesOnly() {
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(RESPONSE_URI).signedCredential(SIGNED_CREDENTIAL)
-                .credentialId(CREDENTIAL_ID).productSpecificationId(PRODUCT_SPECIFICATION_ID).email(null).build();
+                .responseUri(RESPONSE_URI)
+                .signedCredential(SIGNED_CREDENTIAL)
+                .credentialId(CREDENTIAL_ID)
+                .productSpecificationId(PRODUCT_SPECIFICATION_ID)
+                .email(null)
+                .build();
         WebClientResponseException badRequest = WebClientResponseException.create(400, "Bad Request", null, null, null);
+
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.error(badRequest));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+        mockFailureNotificationDependencies();
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload))
                 .verifyComplete();
@@ -228,7 +243,6 @@ class ProcedureRetryServiceImplTest {
 
     @Test
     void handleInitialAction_invalidPayloadType_throwsRetryPayloadException() {
-        // castPayload() throws synchronously (not via Mono.error) – assertThrows is the right approach
         assertThrows(RetryPayloadException.class, () ->
                 service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, "not-a-valid-payload"));
     }
@@ -239,48 +253,35 @@ class ProcedureRetryServiceImplTest {
                 service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, null));
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Retryable errors - use virtual time to skip actual delays
-    // ──────────────────────────────────────────────────────────────────────
-
     @Test
     void handleInitialAction_retryableError_5xx_allRetriesExhausted_createsRetryRecord() {
         WebClientResponseException serverError = WebClientResponseException.create(500, "Internal Server Error", null, null, null);
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.error(serverError));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+        mockFailureNotificationDependencies();
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .expectSubscription()
-                .thenAwait(Duration.ofMinutes(2))   // delay after retry 2
-                .thenAwait(Duration.ofMinutes(5))   // delay after retry 2
-                .thenAwait(Duration.ofMinutes(15))  // delay after retry 3
+                .thenAwait(Duration.ofMinutes(2))
+                .thenAwait(Duration.ofMinutes(5))
+                .thenAwait(Duration.ofMinutes(15))
                 .verifyComplete();
 
-        // Original call + 3 retries = 4 total attempts
         verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(procedureRetryRepository).upsert(any());
     }
 
-    @Test
-    void handleInitialAction_nonRetryableError_401_createsRetryRecordAndSendsFailureNotification() {
-        WebClientResponseException unauthorized =
-                WebClientResponseException.create(401, "Unauthorized", null, null, null);
-
+    @ParameterizedTest
+    @MethodSource("nonRetryableUnauthorizedOrForbiddenErrors")
+    void handleInitialAction_nonRetryableError_401And403_createsRetryRecordAndSendsFailureNotification(
+            WebClientResponseException exception
+    ) {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(unauthorized));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+                .thenReturn(Mono.error(exception));
+        mockFailureNotificationDependencies();
 
         StepVerifier.create(
                         service.handleInitialAction(
@@ -297,152 +298,13 @@ class ProcedureRetryServiceImplTest {
         verify(emailService, times(2)).sendResponseUriFailed(any(), any(), any(), any(), any());
     }
 
-    @Test
-    void handleInitialAction_nonRetryableError_403_createsRetryRecordAndSendsFailureNotification() {
-        WebClientResponseException forbidden =
-                WebClientResponseException.create(403, "Forbidden", null, null, null);
-
+    @ParameterizedTest
+    @MethodSource("retryableErrorsWithVirtualTime")
+    void handleInitialAction_retryableErrors_allRetriesExhausted(Throwable exception) {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(forbidden));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.create(
-                        service.handleInitialAction(
-                                PROCEDURE_ID,
-                                ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
-                                buildPayload()
-                        )
-                )
-                .verifyComplete();
-
-        verify(m2mTokenService, times(1)).getM2MToken();
-        verify(credentialDeliveryService, times(1)).deliverLabelToResponseUri(any(), any(), any(), any());
-        verify(procedureRetryRepository, times(1)).upsert(any());
-        verify(emailService, times(2)).sendResponseUriFailed(any(), any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_408_allRetriesExhausted() {
-        WebClientResponseException timeout = WebClientResponseException.create(408, "Request Timeout", null, null, null);
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(timeout));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.withVirtualTime(() ->
-                        service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
-                .expectSubscription()
-                .thenAwait(Duration.ofMinutes(22))
-                .verifyComplete();
-
-        verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_429_allRetriesExhausted() {
-        WebClientResponseException tooMany = WebClientResponseException.create(429, "Too Many Requests", null, null, null);
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(tooMany));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.withVirtualTime(() ->
-                        service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
-                .expectSubscription()
-                .thenAwait(Duration.ofMinutes(22))
-                .verifyComplete();
-
-        verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_connectException_allRetriesExhausted() {
-        ConnectException connectException = new ConnectException("Connection refused");
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(connectException));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.withVirtualTime(() ->
-                        service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
-                .expectSubscription()
-                .thenAwait(Duration.ofMinutes(22))
-                .verifyComplete();
-
-        verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_timeoutException_allRetriesExhausted() {
-        TimeoutException timeoutException = new TimeoutException("Timed out");
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(timeoutException));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.withVirtualTime(() ->
-                        service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
-                .expectSubscription()
-                .thenAwait(Duration.ofMinutes(22))
-                .verifyComplete();
-
-        verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_webClientRequestException_allRetriesExhausted() {
-        WebClientRequestException requestException = new WebClientRequestException(
-                new IOException("Network error"), HttpMethod.POST, URI.create(RESPONSE_URI), new HttpHeaders());
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(requestException));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
-
-        StepVerifier.withVirtualTime(() ->
-                        service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
-                .expectSubscription()
-                .thenAwait(Duration.ofMinutes(22))
-                .verifyComplete();
-
-        verify(credentialDeliveryService, times(4)).deliverLabelToResponseUri(any(), any(), any(), any());
-    }
-
-    @Test
-    void handleInitialAction_retryableError_responseUriDeliveryException_5xx_allRetriesExhausted() {
-        ResponseUriDeliveryException ex = new ResponseUriDeliveryException("Service unavailable", 503, RESPONSE_URI, CREDENTIAL_ID);
-        when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
-        when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
-                .thenReturn(Mono.error(ex));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+                .thenReturn(Mono.error(exception));
+        mockFailureNotificationDependencies();
 
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
@@ -459,11 +321,7 @@ class ProcedureRetryServiceImplTest {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.error(ex));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+        mockFailureNotificationDependencies();
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
@@ -477,11 +335,7 @@ class ProcedureRetryServiceImplTest {
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.error(ex));
-        when(procedureRetryRepository.upsert(any())).thenReturn(Mono.just(1));
-        when(appConfig.getKnowledgeBaseUploadCertificationGuideUrl()).thenReturn(GUIDE_URL);
-        when(appConfig.getLabelUploadCertifierEmail()).thenReturn(CERTIFIER_EMAIL);
-        when(appConfig.getLabelUploadMarketplaceEmail()).thenReturn(MARKETPLACE_EMAIL);
-        when(emailService.sendResponseUriFailed(any(), any(), any(), any(), any())).thenReturn(Mono.empty());
+        mockFailureNotificationDependencies();
 
         StepVerifier.create(service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .verifyComplete();
@@ -502,17 +356,13 @@ class ProcedureRetryServiceImplTest {
         StepVerifier.withVirtualTime(() ->
                         service.handleInitialAction(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, buildPayload()))
                 .expectSubscription()
-                .thenAwait(Duration.ofMinutes(2)) // retry 2 delay
+                .thenAwait(Duration.ofMinutes(2))
                 .verifyComplete();
 
         verify(credentialDeliveryService, times(2)).deliverLabelToResponseUri(any(), any(), any(), any());
         verify(emailService).sendCertificationUploaded(COMPANY_EMAIL, PRODUCT_SPECIFICATION_ID, CREDENTIAL_ID);
         verify(procedureRetryRepository, never()).upsert(any());
     }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // processPendingRetries
-    // ──────────────────────────────────────────────────────────────────────
 
     @Test
     void processPendingRetries_noPendingRecords_completesImmediately() {
@@ -604,8 +454,6 @@ class ProcedureRetryServiceImplTest {
 
     @Test
     void processPendingRetries_incrementAttemptCountFails_outerErrorResumeContinues() throws Exception {
-        // The outer onErrorResume in processPendingRetries swallows errors from executeRetryAction
-        // (including errors propagated from updateRetryAfterScheduledFailure if incrementAttemptCount fails)
         String payloadJson = objectMapper.writeValueAsString(buildPayload());
         ProcedureRetry failingRecord = buildPendingRecord("INVALID_JSON");
         UUID otherProcedureId = UUID.randomUUID();
@@ -621,10 +469,8 @@ class ProcedureRetryServiceImplTest {
 
         when(procedureRetryRepository.findByStatus(RetryStatus.PENDING))
                 .thenReturn(Flux.just(failingRecord, successRecord));
-        // For failingRecord: deserialization fails → incrementAttemptCount fails → outer onErrorResume
         when(procedureRetryRepository.incrementAttemptCount(eq(PROCEDURE_ID), any(), any()))
                 .thenReturn(Mono.error(new RuntimeException("DB error")));
-        // For successRecord: delivery succeeds → markAsCompleted
         when(m2mTokenService.getM2MToken()).thenReturn(Mono.just(M2M_TOKEN));
         when(credentialDeliveryService.deliverLabelToResponseUri(any(), any(), any(), any()))
                 .thenReturn(Mono.just(ResponseUriDeliveryResult.success()));
@@ -635,13 +481,8 @@ class ProcedureRetryServiceImplTest {
         StepVerifier.create(service.processPendingRetries())
                 .verifyComplete();
 
-        // Second record was still processed despite first failing
         verify(procedureRetryRepository).markAsCompleted(otherProcedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
     }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // createRetryRecord
-    // ──────────────────────────────────────────────────────────────────────
 
     @Test
     void createRetryRecord_success_upsertsRecord() {
@@ -683,10 +524,6 @@ class ProcedureRetryServiceImplTest {
                 .verifyComplete();
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // retryAction
-    // ──────────────────────────────────────────────────────────────────────
-
     @Test
     void retryAction_recordNotFound_throwsProcedureRetryRecordNotFound() {
         when(procedureRetryRepository.findByProcedureIdAndActionType(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
@@ -701,9 +538,11 @@ class ProcedureRetryServiceImplTest {
     @Test
     void retryAction_recordInCompletedStatus_throwsInvalidRetryStatus() {
         ProcedureRetry completed = ProcedureRetry.builder()
-                .id(UUID.randomUUID()).procedureId(PROCEDURE_ID)
+                .id(UUID.randomUUID())
+                .procedureId(PROCEDURE_ID)
                 .actionType(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI)
-                .status(RetryStatus.COMPLETED).build();
+                .status(RetryStatus.COMPLETED)
+                .build();
         when(procedureRetryRepository.findByProcedureIdAndActionType(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(completed));
 
@@ -716,9 +555,11 @@ class ProcedureRetryServiceImplTest {
     @Test
     void retryAction_recordExhausted_throwsInvalidRetryStatus() {
         ProcedureRetry exhausted = ProcedureRetry.builder()
-                .id(UUID.randomUUID()).procedureId(PROCEDURE_ID)
+                .id(UUID.randomUUID())
+                .procedureId(PROCEDURE_ID)
                 .actionType(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI)
-                .status(RetryStatus.RETRY_EXHAUSTED).build();
+                .status(RetryStatus.RETRY_EXHAUSTED)
+                .build();
         when(procedureRetryRepository.findByProcedureIdAndActionType(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .thenReturn(Mono.just(exhausted));
 
@@ -748,10 +589,6 @@ class ProcedureRetryServiceImplTest {
         verify(procedureRetryRepository).markAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // markRetryAsCompleted
-    // ──────────────────────────────────────────────────────────────────────
-
     @Test
     void markRetryAsCompleted_success_rowsAffected() {
         when(procedureRetryRepository.markAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
@@ -771,10 +608,6 @@ class ProcedureRetryServiceImplTest {
         StepVerifier.create(service.markRetryAsCompleted(PROCEDURE_ID, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI))
                 .verifyComplete();
     }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // markRetryAsExhausted
-    // ──────────────────────────────────────────────────────────────────────
 
     @Test
     void markRetryAsExhausted_noOldPendingRecords_completesImmediately() {
@@ -828,8 +661,11 @@ class ProcedureRetryServiceImplTest {
     @Test
     void markRetryAsExhausted_blankEmail_noExhaustionEmail() throws Exception {
         LabelCredentialDeliveryPayload blankEmailPayload = LabelCredentialDeliveryPayload.builder()
-                .responseUri(RESPONSE_URI).signedCredential(SIGNED_CREDENTIAL)
-                .credentialId(CREDENTIAL_ID).email("").build();
+                .responseUri(RESPONSE_URI)
+                .signedCredential(SIGNED_CREDENTIAL)
+                .credentialId(CREDENTIAL_ID)
+                .email("")
+                .build();
         String payloadJson = objectMapper.writeValueAsString(blankEmailPayload);
         ProcedureRetry retryRecord = buildPendingRecord(payloadJson);
 
