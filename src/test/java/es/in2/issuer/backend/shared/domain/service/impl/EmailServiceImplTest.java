@@ -116,7 +116,7 @@ class EmailServiceImplTest {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("response-uri-failed-en"), any(Context.class))).thenReturn("htmlContent");
 
-        StepVerifier.create(emailService.sendResponseUriFailed("to@example.com", "productId", "guideUrl"))
+        StepVerifier.create(emailService.sendResponseUriFailed("to@example.com", "productSpecId", "credentialId", "provider@example.com", "guideUrl"))
                 .verifyComplete();
 
         verify(javaMailSender).send(mimeMessage);
@@ -126,7 +126,7 @@ class EmailServiceImplTest {
     void sendResponseUriFailed_handlesException(){
         when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
 
-        StepVerifier.create(emailService.sendResponseUriFailed("to@example.com", "productId", "guideUrl"))
+        StepVerifier.create(emailService.sendResponseUriFailed("to@example.com", "productSpecId", "credentialId", "provider@example.com", "guideUrl"))
                 .expectError(RuntimeException.class) // service does not map this one
                 .verify();
     }
@@ -137,7 +137,7 @@ class EmailServiceImplTest {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("response-uri-exhausted-en"), any(Context.class))).thenReturn("htmlContent");
 
-        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productId", "guideUrl"))
+        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productSpecId", "credentialId", "provider@example.com", "guideUrl"))
                 .verifyComplete();
 
         verify(javaMailSender).send(mimeMessage);
@@ -147,7 +147,7 @@ class EmailServiceImplTest {
     void sendResponseUriExhausted_handlesException(){
         when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
 
-        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productId", "guideUrl"))
+        StepVerifier.create(emailService.sendResponseUriExhausted("to@example.com", "productSpecId", "credentialId", "provider@example.com", "guideUrl"))
                 .expectError(RuntimeException.class) // service does not map this one
                 .verify();
     }
@@ -158,7 +158,7 @@ class EmailServiceImplTest {
         when(javaMailSender.createMimeMessage()).thenReturn(mimeMessage);
         when(templateEngine.process(eq("certification-uploaded-en"), any(Context.class))).thenReturn("htmlContent");
 
-        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productSpecId", "credentialId"))
                 .verifyComplete();
 
         verify(javaMailSender).send(mimeMessage);
@@ -168,7 +168,7 @@ class EmailServiceImplTest {
     void sendCertificationUploaded_handlesException(){
         when(javaMailSender.createMimeMessage()).thenThrow(new RuntimeException("Mail server error"));
 
-        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productId"))
+        StepVerifier.create(emailService.sendCertificationUploaded("to@example.com", "productSpecId", "credentialId"))
                 .expectError(RuntimeException.class) // service does not map this one
                 .verify();
     }

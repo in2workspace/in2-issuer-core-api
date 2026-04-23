@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Certificación de producto - Acción Requerida</title>
+  <title>Error en la subida de la certificación - Reintentos agotados</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -77,32 +77,22 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>Certificación de producto - Acción Requerida</h1>
+    <h1>Error en la subida de la certificación - Reintentos agotados</h1>
   </div>
   <div class="content">
     <p>
-      <strong>Se han agotado todos los reintentos automáticos</strong> de subida de la certificación para la credencial con ID:
-      <strong><span th:text="${productId}">PRODUCT ID</span></strong>
+      <strong>Se han agotado todos los reintentos automáticos</strong> de subida de la certificación.
+    </p>
+    <p>
+      <strong>Product Specification ID:</strong> <span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span><br/>
+      <strong>Credential ID:</strong> <span th:text="${credentialId}">CREDENTIAL ID</span><br/>
+      <strong>Email del proveedor:</strong> <span th:text="${providerEmail}">PROVIDER EMAIL</span>
     </p>
     
     <p>
-      El sistema intentó subir automáticamente su certificación varias veces, pero no pudo completar el proceso.
-      <strong>Su credencial NO será subida automáticamente.</strong>
+      El sistema intentó subir automáticamente la certificación varias veces, pero no pudo completar el proceso.
+      <strong>La credencial NO será subida automáticamente.</strong>
     </p>
-
-    <div class="action-section">
-      <h3>Qué puede hacer:</h3>
-      
-      <p>
-        <strong>Emitir una nueva certificación</strong><br/>
-        Puede solicitar una nueva certificación para su producto desde el portal.
-      </p>
-      
-      <p style="margin-top: 20px;">
-        <strong>Contactar con Soporte</strong><br/>
-        Si necesita asistencia, nuestro <a href="https://ticketing.dome-marketplace.eu">equipo de soporte</a> está listo para ayudarle.
-      </p>
-    </div>
 
   </div>
   <div class="footer">

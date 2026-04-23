@@ -222,20 +222,17 @@ class CredentialIssuanceWorkflowImplTest {
 
         when(credentialProcedureService.getCredentialProcedureById(PROCEDURE_ID)).thenReturn(Mono.just(proc));
         when(credentialIssuerMetadataService.getCredentialIssuerMetadata(PROCESS_ID)).thenReturn(Mono.just(metadata));
-        // No binding needed (empty) → buildCredentialResponse called with null subjectId
         when(verifiableCredentialService.buildCredentialResponse(
                 eq(PROCESS_ID), isNull(), eq("nonce-abc"), eq("raw-token"), eq(COMPANY_EMAIL), eq(PROCEDURE_ID)))
                 .thenReturn(Mono.just(credentialResponse));
-        // SYNC branch: status check and update
         when(credentialProcedureService.getCredentialStatusByProcedureId(PROCEDURE_ID))
                 .thenReturn(Mono.just("VALID"));
         when(credentialProcedureService.updateCredentialProcedureCredentialStatusToValidByProcedureId(PROCEDURE_ID))
                 .thenReturn(Mono.empty());
         when(credentialProcedureService.getDecodedCredentialByProcedureId(PROCEDURE_ID))
                 .thenReturn(Mono.just("decoded-credential"));
-        // getCredentialProcedureById is called twice (outer + zipWith); one stub covers both
         when(credentialProcedureService.getCredentialId(proc)).thenReturn(Mono.just("cred-id-123"));
-        // Fire-and-forget delivery
+        when(credentialProcedureService.getCredentialSubjectId(proc)).thenReturn(Mono.just("product-spec-123"));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
 
@@ -244,8 +241,12 @@ class CredentialIssuanceWorkflowImplTest {
                 .verifyComplete();
 
         verify(credentialProcedureService).getCredentialId(proc);
-        // handleInitialAction is called synchronously before .subscribe(), so it's recorded by Mockito
-        verify(procedureRetryService).handleInitialAction(eq(UUID.fromString(PROCEDURE_ID)), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any());
+        verify(credentialProcedureService).getCredentialSubjectId(proc);
+        verify(procedureRetryService).handleInitialAction(
+                eq(UUID.fromString(PROCEDURE_ID)),
+                eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI),
+                any()
+        );
     }
 
     @Test
@@ -346,6 +347,7 @@ class CredentialIssuanceWorkflowImplTest {
         String transactionCode = "tx-label-123";
         String signedCredential = "signed.jwt.credential";
         String credentialId = "cred-id-456";
+        String productSpecificationId = "product-spec-456";
         String responseUri = "https://response.example.com/callback";
         String issuerUrl = "https://issuer.example.com";
         String walletUrl = "https://wallet.example.com";
@@ -367,8 +369,7 @@ class CredentialIssuanceWorkflowImplTest {
         when(appConfig.getSysTenant()).thenReturn(sysTenant);
         when(appConfig.getIssuerFrontendUrl()).thenReturn(issuerUrl);
         when(appConfig.getKnowledgebaseWalletUrl()).thenReturn(walletUrl);
-        
-        // handleLabelCredentialIssuance mocks
+
         when(deferredCredentialMetadataService.getProcedureIdByTransactionCode(transactionCode))
                 .thenReturn(Mono.just(PROCEDURE_ID));
         when(issuerFactory.createSimpleIssuerAndNotifyOnError(PROCEDURE_ID, email))
@@ -383,14 +384,15 @@ class CredentialIssuanceWorkflowImplTest {
                 .thenReturn(Mono.empty());
         when(credentialProcedureService.getCredentialProcedureById(PROCEDURE_ID))
                 .thenReturn(Mono.just(proc));
-        
-        // triggerLabelCredentialParallelDelivery mocks
+
         when(emailService.sendCredentialActivationEmail(anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Mono.empty());
         when(deferredCredentialMetadataService.getResponseUriByProcedureId(PROCEDURE_ID))
                 .thenReturn(Mono.just(responseUri));
         when(credentialProcedureService.getCredentialId(proc))
                 .thenReturn(Mono.just(credentialId));
+        when(credentialProcedureService.getCredentialSubjectId(proc))
+                .thenReturn(Mono.just(productSpecificationId));
         when(procedureRetryService.handleInitialAction(any(UUID.class), eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI), any()))
                 .thenReturn(Mono.empty());
 
@@ -399,6 +401,12 @@ class CredentialIssuanceWorkflowImplTest {
 
         verify(credentialSignerWorkflow).signAndUpdateCredentialByProcedureId("token", PROCEDURE_ID, JWT_VC);
         verify(credentialProcedureService).updateCredentialProcedureCredentialStatusToValidByProcedureId(PROCEDURE_ID);
+        verify(credentialProcedureService).getCredentialSubjectId(proc);
+        verify(procedureRetryService).handleInitialAction(
+                eq(UUID.fromString(PROCEDURE_ID)),
+                eq(ActionType.UPLOAD_LABEL_TO_RESPONSE_URI),
+                any()
+        );
     }
 
     @Test

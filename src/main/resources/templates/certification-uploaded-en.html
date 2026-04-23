@@ -62,15 +62,15 @@
         <h1>Certification Successfully Uploaded</h1>
     </div>
     <div class="content">
-        <p><strong>Great news!</strong></p>
         <p>
-            Your product certification has been <strong>successfully uploaded</strong> for credential ID:
+            The product specification with ID <strong><span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span></strong>
+            has been certified with the credential ID:
         </p>
         <div class="credential-id">
-            <span th:text="${productId}">PRODUCT ID</span>
+            <span th:text="${credentialId}">CREDENTIAL ID</span>
         </div>
         <p>
-            Your product is now certified.
+            The product is now certified.
         </p>
     </div>
     <div class="footer">

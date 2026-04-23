@@ -354,18 +354,22 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
                                                                     )))
                                                                     .flatMap(responseUri -> {
                                                                         try {
-                                                                            String companyEmail = updatedCredentialProcedure.getEmail();
+                                                                            String labelEmail = updatedCredentialProcedure.getEmail();
 
-                                                                            return credentialProcedureService.getCredentialId(updatedCredentialProcedure)
-                                                                                    .doOnNext(credentialId ->
-                                                                                            log.debug("Using credentialId for delivery: {}", credentialId)
+                                                                            return Mono.zip(
+                                                                                    credentialProcedureService.getCredentialId(updatedCredentialProcedure),
+                                                                                    credentialProcedureService.getCredentialSubjectId(updatedCredentialProcedure)
+                                                                            )
+                                                                                    .doOnNext(tuple ->
+                                                                                            log.debug("Using credentialId for delivery: {}", tuple.getT1())
                                                                                     )
-                                                                                    .flatMap(credentialId ->
+                                                                                    .flatMap(tuple ->
                                                                                             deliverLabelCredentialWithRetry(
                                                                                                     responseUri,
                                                                                                     signedVc,
-                                                                                                    credentialId,
-                                                                                                    companyEmail,
+                                                                                                    tuple.getT1(),
+                                                                                                    tuple.getT2(),
+                                                                                                    labelEmail,
                                                                                                     UUID.fromString(procedureId)
                                                                                             )
                                                                                     );
@@ -425,16 +429,17 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
      * If initial retries fail, creates a retry record for scheduler-based recovery.
      */
     private Mono<Void> deliverLabelCredentialWithRetry(String responseUri, String signedVc, 
-                                                       String credentialId, String companyEmail, 
-                                                       UUID procedureId) {
-        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} companyEmail={}",
-            procedureId, responseUri, credentialId, companyEmail);
+                                                       String credentialId, String productSpecificationId,
+                                                       String email, UUID procedureId) {
+        log.info("[RETRY] [deliverLabelCredentialWithRetry] Called for procedureId={} responseUri={} credentialId={} productSpecId={} email={}",
+            procedureId, responseUri, credentialId, productSpecificationId, email);
 
         LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
             .responseUri(responseUri)
             .signedCredential(signedVc)
             .credentialId(credentialId)
-            .companyEmail(companyEmail)
+            .productSpecificationId(productSpecificationId)
+            .email(email)
             .build();
 
         // Execute delivery as fire-and-forget (completely parallel)

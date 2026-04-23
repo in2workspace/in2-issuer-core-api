@@ -24,6 +24,11 @@ import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
+
+import java.util.stream.Stream;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -32,8 +37,8 @@ import java.util.UUID;
 
 import static org.hibernate.validator.internal.util.Contracts.assertNotNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -861,6 +866,138 @@ class CredentialProcedureServiceImplTest {
 
         verify(credentialProcedureRepository, times(1)).findByProcedureId(UUID.fromString(procedureId));
         verify(credentialProcedureRepository, never()).save(any(CredentialProcedure.class));
+    }
+
+    // ---------- getCredentialSubjectId tests ----------
+
+        @ParameterizedTest
+        @MethodSource("credentialSubjectIdSuccessCases")
+        void getCredentialSubjectId_shouldReturnId_fromSupportedPaths(
+                String credentialDecoded,
+                String expectedId
+        ) throws Exception {
+        // Given
+        CredentialProcedure credentialProcedure = new CredentialProcedure();
+        credentialProcedure.setCredentialDecoded(credentialDecoded);
+
+        JsonNode credentialNode = new ObjectMapper().readTree(credentialDecoded);
+        when(objectMapper.readTree(credentialDecoded)).thenReturn(credentialNode);
+
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNext(expectedId)
+                .verifyComplete();
+        }
+
+        private static Stream<Arguments> credentialSubjectIdSuccessCases() {
+        return Stream.of(
+                Arguments.of(
+                        "{\"vc\":{\"credentialSubject\":{\"id\":\"subject-id-123\"}}}",
+                        "subject-id-123"
+                ),
+                Arguments.of(
+                        "{\"credentialSubject\":{\"id\":\"fallback-subject-id-456\"}}",
+                        "fallback-subject-id-456"
+                ),
+                Arguments.of(
+                        "{\"vc\":{\"credentialSubject\":{\"id\":\"\"}},\"credentialSubject\":{\"id\":\"root-level-id\"}}",
+                        "root-level-id"
+                )
+        );
+        }
+
+    @Test
+    void getCredentialSubjectId_shouldReturnEmptyString_whenNoIdFound() throws Exception {
+        // Given
+        String credentialDecoded = "{\"vc\":{\"credentialSubject\":{\"name\":\"test\"}},\"credentialSubject\":{}}";
+
+        CredentialProcedure credentialProcedure = new CredentialProcedure();
+        credentialProcedure.setCredentialDecoded(credentialDecoded);
+
+        JsonNode credentialNode = new ObjectMapper().readTree(credentialDecoded);
+        when(objectMapper.readTree(credentialDecoded)).thenReturn(credentialNode);
+
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNext("")
+                .verifyComplete();
+    }
+
+    @Test
+    void getCredentialSubjectId_shouldReturnEmptyString_whenBothIdsAreBlank() throws Exception {
+        // Given (both paths have blank values)
+        String credentialDecoded = "{\"vc\":{\"credentialSubject\":{\"id\":\"\"}},\"credentialSubject\":{\"id\":\"   \"}}";
+        
+        CredentialProcedure credentialProcedure = new CredentialProcedure();
+        credentialProcedure.setCredentialDecoded(credentialDecoded);
+
+        JsonNode credentialNode = new ObjectMapper().readTree(credentialDecoded);
+        when(objectMapper.readTree(credentialDecoded)).thenReturn(credentialNode);
+
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
+
+        // Then
+        StepVerifier.create(result)
+                .expectNext("")
+                .verifyComplete();
+    }
+
+    @Test
+    void getCredentialSubjectId_shouldReturnError_whenCredentialProcedureIsNull() {
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(null);
+
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof ParseCredentialJsonException &&
+                                throwable.getMessage().equals("CredentialProcedure or credentialDecoded is null"))
+                .verify();
+    }
+
+    @Test
+    void getCredentialSubjectId_shouldReturnError_whenCredentialDecodedIsNull() {
+        // Given
+        CredentialProcedure credentialProcedure = new CredentialProcedure();
+        credentialProcedure.setCredentialDecoded(null);
+
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
+
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof ParseCredentialJsonException &&
+                                throwable.getMessage().equals("CredentialProcedure or credentialDecoded is null"))
+                .verify();
+    }
+
+    @Test
+    void getCredentialSubjectId_shouldReturnError_whenJsonIsInvalid() throws Exception {
+        // Given
+        String invalidJson = "{\"vc\":{\"credentialSubject\":{\"id\":\"test\"}";
+        CredentialProcedure credentialProcedure = new CredentialProcedure();
+        credentialProcedure.setCredentialDecoded(invalidJson);
+
+        when(objectMapper.readTree(invalidJson))
+                .thenThrow(new JsonParseException(null, "Malformed JSON"));
+
+        // When
+        Mono<String> result = credentialProcedureService.getCredentialSubjectId(credentialProcedure);
+
+        // Then
+        StepVerifier.create(result)
+                .expectErrorMatches(throwable ->
+                        throwable instanceof ParseCredentialJsonException &&
+                                throwable.getMessage().equals("Error parsing credential JSON"))
+                .verify();
     }
 
 }

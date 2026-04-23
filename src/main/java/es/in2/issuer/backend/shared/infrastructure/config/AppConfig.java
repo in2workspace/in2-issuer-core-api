@@ -5,6 +5,7 @@ import es.in2.issuer.backend.shared.infrastructure.config.adapter.factory.Config
 import es.in2.issuer.backend.shared.infrastructure.config.properties.AppProperties;
 import es.in2.issuer.backend.shared.infrastructure.config.properties.CorsProperties;
 import es.in2.issuer.backend.shared.infrastructure.config.properties.IssuerIdentityProperties;
+import es.in2.issuer.backend.shared.infrastructure.config.properties.LabelUploadProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
@@ -16,17 +17,20 @@ public class AppConfig {
     private final AppProperties appProperties;
     private final IssuerIdentityProperties issuerIdentityProperties;
     private final CorsProperties corsProperties;
+    private final LabelUploadProperties labelUploadProperties;
 
     public AppConfig(
             ConfigAdapterFactory configAdapterFactory,
             AppProperties appProperties,
             IssuerIdentityProperties issuerIdentityProperties,
-            CorsProperties corsProperties
+            CorsProperties corsProperties,
+            LabelUploadProperties labelUploadProperties
     ) {
         this.configAdapter = configAdapterFactory.getAdapter();
         this.appProperties = appProperties;
         this.issuerIdentityProperties = issuerIdentityProperties;
         this.corsProperties = corsProperties;
+        this.labelUploadProperties = labelUploadProperties;
     }
 
     public String getIssuerBackendUrl() {
@@ -90,5 +94,13 @@ public class AppConfig {
 
     public String getSysTenant(){
         return configAdapter.getConfiguration(appProperties.sysTenant());
+    }
+
+    public String getLabelUploadCertifierEmail() {
+        return labelUploadProperties.certifierEmail();
+    }
+
+    public String getLabelUploadMarketplaceEmail() {
+        return labelUploadProperties.marketplaceEmail();
     }
 }

@@ -9,7 +9,8 @@ import lombok.Builder;
 public record LabelCredentialDeliveryPayload(
         String responseUri,
         String credentialId, 
-        String companyEmail,
+        String productSpecificationId,
+        String email,
         String signedCredential
 ) {
 }

@@ -30,6 +30,8 @@ import java.util.function.Consumer;
 
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.MAIL_ERROR_COMMUNICATION_EXCEPTION_MESSAGE;
 import static es.in2.issuer.backend.backoffice.domain.util.Constants.UTF_8;
+import static es.in2.issuer.backend.shared.domain.util.Constants.CREDENTIAL_ID;
+import static es.in2.issuer.backend.shared.domain.util.Constants.PRODUCT_SPECIFICATION_ID;
 
 @Slf4j
 @Service
@@ -161,38 +163,45 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
-    public Mono<Void> sendResponseUriFailed(String to, String productId, String guideUrl) {
+    public Mono<Void> sendResponseUriFailed(String to, String productSpecificationId, String credentialId, String providerEmail, String guideUrl) {
         return sendTemplatedEmail(
                 to,
                 "email.unsuccessful-submission",
                 "response-uri-failed",
                 context -> {
-                    context.setVariable(PRODUCT_ID, productId);
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
+                    context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
         );
     }
 
     @Override
-    public Mono<Void> sendResponseUriExhausted(String to, String productId, String guideUrl) {
+    public Mono<Void> sendResponseUriExhausted(String to, String productSpecificationId, String credentialId, String providerEmail, String guideUrl) {
         return sendTemplatedEmail(
                 to,
                 "email.retry-exhausted-submission",
                 "response-uri-exhausted",
                 context -> {
-                    context.setVariable(PRODUCT_ID, productId);
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
+                    context.setVariable("providerEmail", providerEmail);
                     context.setVariable("guideUrl", guideUrl);
                 }
         );
     }
 
     @Override
-    public Mono<Void> sendCertificationUploaded(String to, String productId) {
+    public Mono<Void> sendCertificationUploaded(String to, String productSpecificationId, String credentialId) {
         return sendTemplatedEmail(
                 to,
                 "email.certification-uploaded",
                 "certification-uploaded",
-                context -> context.setVariable(PRODUCT_ID, productId)
+                context -> {
+                    context.setVariable(PRODUCT_SPECIFICATION_ID, productSpecificationId);
+                    context.setVariable(CREDENTIAL_ID, credentialId);
+                }
         );
     }
 
@@ -276,7 +285,7 @@ public class EmailServiceImpl implements EmailService {
     private Context buildEmailContext(String organization, String credentialId, String type, String credentialStatus) {
         Context context = new Context();
         context.setVariable("organization", organization);
-        context.setVariable("credentialId", credentialId);
+        context.setVariable(CREDENTIAL_ID, credentialId);
         context.setVariable("type", type);
         context.setVariable("credentialStatus", credentialStatus);
         return context;

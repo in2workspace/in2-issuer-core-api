@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product Certification - Action Required</title>
+  <title>Certification Upload Failed - Retries Exhausted</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -77,32 +77,22 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1>Product Certification - Action Required</h1>
+    <h1>Certification Upload Failed - Retries Exhausted</h1>
   </div>
   <div class="content">
     <p>
-      <strong>All automatic retry attempts have been exhausted</strong> for the certification upload for the credential with ID:
-      <strong><span th:text="${productId}">PRODUCT ID</span></strong>
+      <strong>All automatic retry attempts have been exhausted</strong> for the certification upload.
+    </p>
+    <p>
+      <strong>Product Specification ID:</strong> <span th:text="${productSpecificationId}">PRODUCT SPECIFICATION ID</span><br/>
+      <strong>Credential ID:</strong> <span th:text="${credentialId}">CREDENTIAL ID</span><br/>
+      <strong>Provider email:</strong> <span th:text="${providerEmail}">PROVIDER EMAIL</span>
     </p>
 
     <p>
-      The system attempted to automatically upload your certification several times, but could not complete the process.
-      <strong>Your credential will NOT be uploaded automatically.</strong>
+      The system attempted to automatically upload the certification several times, but could not complete the process.
+      <strong>The credential will NOT be uploaded automatically.</strong>
     </p>
-
-    <div class="action-section">
-      <h3>What you can do:</h3>
-
-      <p>
-        <strong>Issue a new certification</strong><br/>
-        You can request a new certification for your product from the portal.
-      </p>
-
-      <p style="margin-top: 20px;">
-        <strong>Contact Support</strong><br/>
-        If you need assistance, our <a href="https://ticketing.dome-marketplace.eu">support team</a> is ready to help you.
-      </p>
-    </div>
 
   </div>
   <div class="footer">

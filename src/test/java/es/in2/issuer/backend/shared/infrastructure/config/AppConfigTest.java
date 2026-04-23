@@ -5,6 +5,7 @@ import es.in2.issuer.backend.shared.infrastructure.config.adapter.factory.Config
 import es.in2.issuer.backend.shared.infrastructure.config.properties.AppProperties;
 import es.in2.issuer.backend.shared.infrastructure.config.properties.CorsProperties;
 import es.in2.issuer.backend.shared.infrastructure.config.properties.IssuerIdentityProperties;
+import es.in2.issuer.backend.shared.infrastructure.config.properties.LabelUploadProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,8 @@ class AppConfigTest {
     private IssuerIdentityProperties issuerIdentityProperties;
     @Mock
     private CorsProperties corsProperties;
+    @Mock
+    private LabelUploadProperties labelProperties;
 
 
     private AppConfig appConfig;
@@ -44,7 +47,7 @@ class AppConfigTest {
     @BeforeEach
     void setUp() {
         when(configAdapterFactory.getAdapter()).thenReturn(configAdapter);
-        appConfig = new AppConfig(configAdapterFactory, appProperties, issuerIdentityProperties, corsProperties);
+        appConfig = new AppConfig(configAdapterFactory, appProperties, issuerIdentityProperties, corsProperties, labelProperties);
     }
 
     @Test

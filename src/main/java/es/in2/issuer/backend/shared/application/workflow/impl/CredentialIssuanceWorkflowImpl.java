@@ -161,13 +161,19 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
         // Fire-and-forget: Send to response URI with retry mechanism
         return deferredCredentialMetadataService.getResponseUriByProcedureId(procedureId)
                 .flatMap(responseUri ->
-                        credentialProcedureService.getCredentialId(credentialProcedure)
-                                .flatMap(credentialId -> {
+                        Mono.zip(
+                                credentialProcedureService.getCredentialId(credentialProcedure),
+                                credentialProcedureService.getCredentialSubjectId(credentialProcedure)
+                        )
+                                .flatMap(tuple -> {
+                                    String credentialId = tuple.getT1();
+                                    String productSpecificationId = tuple.getT2();
                                     LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
                                             .responseUri(responseUri)
                                             .signedCredential(signedCredential)
                                             .credentialId(credentialId)
-                                            .companyEmail(credentialProcedure.getEmail())
+                                            .productSpecificationId(productSpecificationId)
+                                            .email(credentialProcedure.getEmail())
                                             .build();
 
                                     // Execute delivery as fire-and-forget
@@ -523,13 +529,19 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                         return Mono.error(new IllegalStateException("Encoded credential not found for procedureId: " + updatedCredentialProcedure.getProcedureId()));
                                     }
 
-                                    return credentialProcedureService.getCredentialId(credentialProcedure)
-                                            .flatMap(credentialId -> {
+                                    return Mono.zip(
+                                            credentialProcedureService.getCredentialId(updatedCredentialProcedure),
+                                            credentialProcedureService.getCredentialSubjectId(updatedCredentialProcedure)
+                                    )
+                                            .flatMap(idsTuple -> {
+                                                String credentialId = idsTuple.getT1();
+                                                String productSpecificationId = idsTuple.getT2();
                                                 LabelCredentialDeliveryPayload payload = LabelCredentialDeliveryPayload.builder()
                                                         .responseUri(deferred.getResponseUri())
                                                         .signedCredential(encodedCredential)
                                                         .credentialId(credentialId)
-                                                        .companyEmail(credentialProcedure.getEmail())
+                                                        .productSpecificationId(productSpecificationId)
+                                                        .email(credentialProcedure.getEmail())
                                                         .build();
                                                 
                                                 // Execute delivery as fire-and-forget (completely parallel)

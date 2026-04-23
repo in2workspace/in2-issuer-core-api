@@ -213,6 +213,12 @@ cors:
   # The allowed origins for CORS requests coming from the external services (REQUIRED)
   external-allowed-origins:
 
+label-upload:
+  # The email address of the certifier to notify on upload failures (REQUIRED)
+  certifier-email:
+  # The email address of the marketplace to notify on upload failures (REQUIRED)
+  marketplace-email:
+
 vault:
   hashicorp:
     url:
