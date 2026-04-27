@@ -1,6 +1,6 @@
 package es.in2.issuer.backend.shared.domain.model.entities;
 
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.shared.domain.model.enums.RetryableActionType;
 import es.in2.issuer.backend.shared.domain.model.enums.RetryStatus;
 import lombok.*;
 import org.springframework.data.annotation.*;
@@ -27,7 +27,7 @@ public class ProcedureRetry {
     private UUID procedureId;
 
     @Column("action_type")
-    private ActionType actionType;
+    private RetryableActionType actionType;
 
     @Column("status")
     private RetryStatus status;

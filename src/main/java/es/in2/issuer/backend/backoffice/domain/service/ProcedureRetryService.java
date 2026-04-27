@@ -1,6 +1,7 @@
 package es.in2.issuer.backend.backoffice.domain.service;
 
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.backoffice.domain.model.dtos.RetryableProcedureAction;
+import es.in2.issuer.backend.shared.domain.model.enums.RetryableActionType;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -13,22 +14,17 @@ public interface ProcedureRetryService {
      * On success: sends success email (non-blocking).
      * On failure after retries: creates retry record, sends failure email once (non-blocking).
      */
-    Mono<Void> handleInitialAction(UUID procedureId, ActionType actionType, Object payload);
+    Mono<Void> handleInitialAction(RetryableProcedureAction<?> action);
 
     /**
      * Creates a retry record when initial action fails.
      */
-    Mono<Void> createRetryRecord(UUID procedureId, ActionType actionType, Object payload);
-
-    /**
-     * Executes retry attempts for a specific procedure and action type.
-     */
-    Mono<Void> retryAction(UUID procedureId, ActionType actionType);
+    Mono<Void> createRetryRecord(UUID procedureId, RetryableActionType actionType, Object payload);
 
     /**
      * Marks a retry as successful.
      */
-    Mono<Void> markRetryAsCompleted(UUID procedureId, ActionType actionType);
+    Mono<Void> markRetryAsCompleted(UUID procedureId, RetryableActionType actionType);
 
     /**
      * Marks retries as exhausted for records older than the exhaustion threshold.

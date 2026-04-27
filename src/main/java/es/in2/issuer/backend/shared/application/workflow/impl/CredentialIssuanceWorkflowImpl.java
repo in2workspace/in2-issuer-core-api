@@ -11,7 +11,8 @@ import es.in2.issuer.backend.shared.domain.model.dto.credential.lear.employee.LE
 import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
 import es.in2.issuer.backend.shared.domain.model.entities.CredentialProcedure;
 import es.in2.issuer.backend.shared.domain.model.entities.DeferredCredentialMetadata;
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.backoffice.domain.model.dtos.RetryableProcedureAction;
+import es.in2.issuer.backend.shared.domain.model.enums.RetryableActionType;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialStatusEnum;
 import es.in2.issuer.backend.shared.domain.model.enums.CredentialType;
 import es.in2.issuer.backend.shared.domain.service.*;
@@ -178,10 +179,7 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
 
                                     // Execute delivery as fire-and-forget
                                     procedureRetryService.handleInitialAction(
-                                                    UUID.fromString(procedureId),
-                                                    ActionType.UPLOAD_LABEL_TO_RESPONSE_URI,
-                                                    payload
-                                            )
+                                                    new RetryableProcedureAction<>(RetryableActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload, UUID.fromString(procedureId)))
                                             .subscribeOn(Schedulers.boundedElastic())
                                             .subscribe(
                                                     unused -> log.debug("Triggered label credential delivery retry pipeline for procedureId: {}", procedureId),
@@ -545,7 +543,8 @@ public class CredentialIssuanceWorkflowImpl implements CredentialIssuanceWorkflo
                                                         .build();
                                                 
                                                 // Execute delivery as fire-and-forget (completely parallel)
-                                                procedureRetryService.handleInitialAction(updatedCredentialProcedure.getProcedureId(), ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
+                                                procedureRetryService.handleInitialAction(
+                                                                new RetryableProcedureAction<>(RetryableActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload, updatedCredentialProcedure.getProcedureId()))
                                                         .subscribeOn(Schedulers.boundedElastic())
                                                         .subscribe();
                                                 
