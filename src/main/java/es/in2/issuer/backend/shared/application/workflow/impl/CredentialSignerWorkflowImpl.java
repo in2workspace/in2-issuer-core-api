@@ -27,9 +27,10 @@ import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialEmployeeFa
 import es.in2.issuer.backend.shared.domain.util.factory.LEARCredentialMachineFactory;
 import es.in2.issuer.backend.shared.domain.util.factory.LabelCredentialFactory;
 import es.in2.issuer.backend.shared.infrastructure.repository.CredentialProcedureRepository;
+import es.in2.issuer.backend.backoffice.domain.model.dtos.RetryableProcedureAction;
 import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
 import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.shared.domain.model.enums.RetryableActionType;
 import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -443,9 +444,10 @@ public class CredentialSignerWorkflowImpl implements CredentialSignerWorkflow {
             .build();
 
         // Execute delivery as fire-and-forget (completely parallel)
-        procedureRetryService.handleInitialAction(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-            .subscribeOn(Schedulers.boundedElastic())
-            .subscribe();
+        procedureRetryService.handleInitialAction(
+                        new RetryableProcedureAction<>(RetryableActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload, procedureId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe();
         
         // Main flow continues immediately without waiting for upload
         return Mono.empty();

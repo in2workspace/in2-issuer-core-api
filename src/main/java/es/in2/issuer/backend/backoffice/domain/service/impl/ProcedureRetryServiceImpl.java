@@ -1,19 +1,16 @@
 package es.in2.issuer.backend.backoffice.domain.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import es.in2.issuer.backend.backoffice.domain.model.dtos.RetryableProcedureAction;
 import es.in2.issuer.backend.backoffice.domain.service.ProcedureRetryService;
-import es.in2.issuer.backend.shared.domain.exception.ProcedureRetryRecordNotFoundException;
-import es.in2.issuer.backend.shared.domain.exception.InvalidRetryStatusException;
-import es.in2.issuer.backend.shared.domain.exception.RetryPayloadException;
-import es.in2.issuer.backend.shared.domain.exception.RetryConfigurationException;
+import es.in2.issuer.backend.backoffice.domain.service.RetryableActionHandler;
+import es.in2.issuer.backend.backoffice.domain.service.RetryableActionHandlerRegistry;
 import es.in2.issuer.backend.shared.domain.exception.ResponseUriDeliveryException;
-import es.in2.issuer.backend.shared.domain.model.dto.ResponseUriDeliveryResult;
-import es.in2.issuer.backend.shared.domain.model.dto.retry.LabelCredentialDeliveryPayload;
+import es.in2.issuer.backend.shared.domain.exception.RetryConfigurationException;
+import es.in2.issuer.backend.shared.domain.exception.RetryPayloadException;
 import es.in2.issuer.backend.shared.domain.model.entities.ProcedureRetry;
-import es.in2.issuer.backend.shared.domain.model.enums.ActionType;
+import es.in2.issuer.backend.shared.domain.model.enums.RetryableActionType;
 import es.in2.issuer.backend.shared.domain.model.enums.RetryStatus;
-import es.in2.issuer.backend.shared.domain.service.*;
-import es.in2.issuer.backend.shared.infrastructure.config.AppConfig;
 import es.in2.issuer.backend.backoffice.infrastructure.repository.ProcedureRetryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,18 +34,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
 
     private final ProcedureRetryRepository procedureRetryRepository;
     private final ObjectMapper objectMapper;
-    private final CredentialDeliveryService credentialDeliveryService;
-    private final M2MTokenService m2mTokenService;
-    private final EmailService emailService;
-    private final AppConfig appConfig;
-
-    // Retry configuration constants
-    private static final int INITIAL_RETRY_ATTEMPTS = 3;
-    private static final Duration[] INITIAL_RETRY_DELAYS = {
-            Duration.ofMinutes(2),
-            Duration.ofMinutes(5),
-            Duration.ofMinutes(15)
-    };
+    private final RetryableActionHandlerRegistry handlerRegistry;
 
     private static final Duration EXHAUSTION_THRESHOLD = Duration.ofDays(14);
 
@@ -57,32 +43,20 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     @Override
-    public Mono<Void> handleInitialAction(UUID procedureId, ActionType actionType, Object payload) {
-        log.info("[RETRY] Handling initial action for procedureId={} actionType={}", procedureId, actionType);
-        return switch (actionType) {
-            case UPLOAD_LABEL_TO_RESPONSE_URI ->
-                    handleInitialLabelDeliveryAction(
-                            procedureId,
-                            castPayload(payload, LabelCredentialDeliveryPayload.class)
-                    );
-        };
-    }
-
-    private Mono<Void> handleInitialLabelDeliveryAction(
-            UUID procedureId,
-            LabelCredentialDeliveryPayload payload
-    ) {
-        return deliverLabelWithImmediateRetries(payload)
+    public Mono<Void> handleInitialAction(RetryableProcedureAction<?> action) {
+        log.info("[RETRY] Handling initial action for procedureId={} actionType={}", action.procedureId(), action.actionType());
+        RetryableActionHandler<Object> handler = handlerRegistry.getHandler(action.actionType());
+        Object payload = castPayload(action.payload(), handler.getPayloadType());
+        return handler.execute(payload)
+                .retryWhen(createRetrySpec(action.actionType().name(), handler.getInitialRetryAttempts(), handler.getInitialRetryDelays()))
                 .flatMap(result -> {
-                    log.info("[DELIVERY] Initial delivery succeeded for credId: {}", payload.credentialId());
-                    return sendSuccessNotificationSafely(payload.email(), payload.productSpecificationId(), payload.credentialId(), result);
+                    log.info("[DELIVERY] Initial delivery succeeded for procedure {}", action.procedureId());
+                    return handler.onInitialSuccess(payload, result);
                 })
                 .onErrorResume(e -> {
-                    log.error("[DELIVERY] Initial delivery failed after all retries for credId: {} - {}",
-                            payload.credentialId(), e.getMessage());
-
-                    return createRetryRecord(procedureId, ActionType.UPLOAD_LABEL_TO_RESPONSE_URI, payload)
-                            .then(sendInitialFailureNotificationSafely(payload.productSpecificationId(), payload.credentialId(), payload.email()));
+                    log.error("[DELIVERY] Initial delivery failed after all retries for procedure {}: {}", action.procedureId(), e.getMessage());
+                    return createRetryRecord(action.procedureId(), action.actionType(), payload)
+                            .then(handler.onInitialFailure(payload));
                 });
     }
 
@@ -95,7 +69,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
         log.info("[RETRY] Starting processing of pending retries");
         return procedureRetryRepository.findByStatus(RetryStatus.PENDING)
                 .flatMap(retryRecord ->
-                        executeRetryAction(retryRecord)
+                        executeScheduledRetry(retryRecord)
                                 .onErrorResume(error -> {
                                     log.warn(
                                             "[SCHEDULER] Continuing after error processing retry for procedure {}: {}",
@@ -110,56 +84,31 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 .doOnSuccess(unused -> log.info("[SCHEDULER] Completed processing all pending retries"));
     }
 
-    private Mono<Void> executeRetryAction(ProcedureRetry retryRecord) {
-        return switch (retryRecord.getActionType()) {
-            case UPLOAD_LABEL_TO_RESPONSE_URI -> handleScheduledLabelDelivery(retryRecord);
-        };
-    }
-
-    private Mono<Void> handleScheduledLabelDelivery(ProcedureRetry retryRecord) {
-        log.info("[SCHEDULER] Processing retry attempt {} for procedure {} action {}",
-                retryRecord.getAttemptCount() + 1, retryRecord.getProcedureId(), retryRecord.getActionType());
-
-        return deserializePayload(retryRecord)
-                .flatMap(payload ->
-                        deliverLabelWithImmediateRetries(payload)
-                                .flatMap(result -> {
-                                    log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
-                                    return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
-                                            .then(sendScheduledSuccessNotifications(payload, result));
-                                })
-                )
+    private Mono<Void> executeScheduledRetry(ProcedureRetry retryRecord) {
+        RetryableActionHandler<Object> handler = handlerRegistry.getHandler(retryRecord.getActionType());
+        return deserializePayload(retryRecord, handler.getPayloadType())
+                .flatMap(payload -> executeDeliveryWithScheduledCallbacks(handler, payload, retryRecord))
                 .onErrorResume(e -> {
-                    log.warn("[SCHEDULER] Delivery failed for procedure {}: {}",
-                            retryRecord.getProcedureId(), e.getMessage(), e);
-                    return updateRetryAfterScheduledFailure(retryRecord);
+                    log.warn("[SCHEDULER] Delivery failed for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage(), e);
+                    return incrementAttemptCount(retryRecord);
                 });
     }
 
-    private Mono<Void> sendScheduledSuccessNotifications(LabelCredentialDeliveryPayload payload, ResponseUriDeliveryResult result) {
-        return Mono.when(
-                sendSuccessNotificationSafely(payload.email(), payload.productSpecificationId(), payload.credentialId(), result),
-                sendSuccessNotificationSafely(appConfig.getLabelUploadCertifierEmail(), payload.productSpecificationId(), payload.credentialId(), result),
-                sendSuccessNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), payload.productSpecificationId(), payload.credentialId(), result)
-        );
-    }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Pure delivery with immediate retries (no emails, no persistence)
-    // ──────────────────────────────────────────────────────────────────────
-
-    private Mono<ResponseUriDeliveryResult> deliverLabelWithImmediateRetries(LabelCredentialDeliveryPayload payload) {
-        log.info("[DELIVERY] Attempting to deliver label for credId: {} with immediate retries", payload.credentialId());
-        return m2mTokenService.getM2MToken()
-                .flatMap(m2mToken ->
-                        credentialDeliveryService.deliverLabelToResponseUri(
-                                payload.responseUri(),
-                                payload.signedCredential(),
-                                payload.credentialId(),
-                                m2mToken.accessToken()
-                        )
-                )
-                .retryWhen(createRetrySpec("deliverLabel", INITIAL_RETRY_ATTEMPTS, INITIAL_RETRY_DELAYS));
+    private <T> Mono<Void> executeDeliveryWithScheduledCallbacks(RetryableActionHandler<T> handler, T payload, ProcedureRetry retryRecord) {
+        log.info("[SCHEDULER] Processing retry attempt {} for procedure {} action {}",
+                retryRecord.getAttemptCount() + 1, retryRecord.getProcedureId(), retryRecord.getActionType());
+        return handler.execute(payload)
+                .retryWhen(createRetrySpec("scheduled-" + retryRecord.getActionType(), handler.getInitialRetryAttempts(), handler.getInitialRetryDelays()))
+                .flatMap(result -> {
+                    log.info("[SCHEDULER] Delivery succeeded for procedure {}", retryRecord.getProcedureId());
+                    return markRetryAsCompleted(retryRecord.getProcedureId(), retryRecord.getActionType())
+                            .then(handler.onScheduledSuccess(payload, result));
+                })
+                .onErrorResume(e -> {
+                    log.warn("[SCHEDULER] Delivery failed for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage(), e);
+                    return handler.onSchedulerFailure(payload, retryRecord.getProcedureId())
+                            .then(incrementAttemptCount(retryRecord));
+                });
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -167,7 +116,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     // ──────────────────────────────────────────────────────────────────────
 
     @Override
-    public Mono<Void> createRetryRecord(UUID procedureId, ActionType actionType, Object payload) {
+    public Mono<Void> createRetryRecord(UUID procedureId, RetryableActionType actionType, Object payload) {
         log.debug("[RETRY] Creating retry record for procedureId={} actionType={}", procedureId, actionType);
 
         return Mono.fromCallable(() -> {
@@ -193,7 +142,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                     if (rowsAffected == null || rowsAffected == 0) {
                         log.warn("[RETRY] No retry record inserted/updated for procedureId={} actionType={}", procedureId, actionType);
                     } else {
-                        log.info("[debug] Upserted retry record for procedureId={} actionType={} (rows: {})", procedureId, actionType, rowsAffected);
+                        log.debug("[RETRY] Upserted retry record for procedureId={} actionType={} (rows: {})", procedureId, actionType, rowsAffected);
                     }
                 })
                 .then()
@@ -204,16 +153,7 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
     }
 
     @Override
-    public Mono<Void> retryAction(UUID procedureId, ActionType actionType) {
-        return procedureRetryRepository.findByProcedureIdAndActionType(procedureId, actionType)
-                .switchIfEmpty(Mono.error(new ProcedureRetryRecordNotFoundException("No retry record found for procedure " + procedureId + " and action " + actionType)))
-                .filter(retryRecord -> retryRecord.getStatus() == RetryStatus.PENDING)
-                .switchIfEmpty(Mono.error(new InvalidRetryStatusException("Retry record is not in PENDING status")))
-                .flatMap(this::executeRetryAction);
-    }
-
-    @Override
-    public Mono<Void> markRetryAsCompleted(UUID procedureId, ActionType actionType) {
+    public Mono<Void> markRetryAsCompleted(UUID procedureId, RetryableActionType actionType) {
         return procedureRetryRepository.markAsCompleted(procedureId, actionType)
                 .doOnNext(rowsAffected -> {
                     if (rowsAffected == null || rowsAffected == 0) {
@@ -248,123 +188,27 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                                     log.warn("[RETRY] Failed to mark retry as exhausted for procedure {} (record may have been modified)", retryRecord.getProcedureId());
                                 }
                             })
-                            .then(sendExhaustionNotificationSafely(retryRecord));
+                            .then(sendExhaustionNotification(retryRecord));
                 })
                 .then();
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Non-blocking email notifications
-    // ──────────────────────────────────────────────────────────────────────
-
-    private Mono<Void> sendSuccessNotificationSafely(String email, String productSpecificationId, String credentialId, ResponseUriDeliveryResult result) {
-        if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No email available for success notification, credId: {}", credentialId);
-            return Mono.empty();
-        }
-
-        Mono<Void> emailMono;
-        if (result.acceptedWithHtml() && result.html() != null) {
-            emailMono = emailService.sendResponseUriAcceptedWithHtml(email, credentialId, result.html());
-        } else {
-            emailMono = emailService.sendCertificationUploaded(email, productSpecificationId, credentialId);
-        }
-
-        return emailMono
-                .doOnSuccess(unused -> log.info("[NOTIFICATION] Success email sent for credId: {}", credentialId))
+    private Mono<Void> sendExhaustionNotification(ProcedureRetry retryRecord) {
+        RetryableActionHandler<Object> handler = handlerRegistry.getHandler(retryRecord.getActionType());
+        return deserializePayload(retryRecord, handler.getPayloadType())
+                .flatMap(payload -> handler.onExhausted(payload, retryRecord.getProcedureId()))
                 .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send success email for credId: {}: {}", credentialId, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    private Mono<Void> sendInitialFailureNotificationSafely(String productSpecificationId, String credentialId, String providerEmail) {
-        return Mono.when(
-                sendFailureNotificationSafely(appConfig.getLabelUploadCertifierEmail(), productSpecificationId, credentialId, providerEmail, "certifier"),
-                sendFailureNotificationSafely(appConfig.getLabelUploadMarketplaceEmail(), productSpecificationId, credentialId, providerEmail, "marketplace")
-        );
-    }
-
-    private Mono<Void> sendFailureNotificationSafely(String email, String productSpecificationId, String credentialId, String providerEmail, String recipientType) {
-        if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No {} email available for failure notification, productSpecId: {}", recipientType, productSpecificationId);
-            return Mono.empty();
-        }
-
-        return emailService.sendResponseUriFailed(
-                        email,
-                        productSpecificationId,
-                        credentialId,
-                        providerEmail,
-                        appConfig.getKnowledgeBaseUploadCertificationGuideUrl()
-                )
-                .doOnSuccess(unused ->
-                        log.info("[NOTIFICATION] Failure email sent to {} for productSpecId: {}, credId: {}", recipientType, productSpecificationId, credentialId)
-                )
-                .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send failure email to {} for productSpecId: {}, credId: {}: {}",
-                            recipientType, productSpecificationId, credentialId, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
-    private Mono<Void> sendExhaustionNotificationSafely(ProcedureRetry retryRecord) {
-        return deserializePayload(retryRecord)
-                .flatMap(payload ->
-                        Mono.when(
-                                sendExhaustionNotificationSafely(
-                                        appConfig.getLabelUploadCertifierEmail(),
-                                        payload.productSpecificationId(),
-                                        payload.credentialId(),
-                                        payload.email(),
-                                        retryRecord.getProcedureId(),
-                                        "certifier"
-                                ),
-                                sendExhaustionNotificationSafely(
-                                        appConfig.getLabelUploadMarketplaceEmail(),
-                                        payload.productSpecificationId(),
-                                        payload.credentialId(),
-                                        payload.email(),
-                                        retryRecord.getProcedureId(),
-                                        "marketplace"
-                                )
-                        )
-                )
-                .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to deserialize payload for exhaustion notification, procedure: {}: {}",
+                    log.error("[NOTIFICATION] Failed to send exhaustion notification for procedure {}: {}",
                             retryRecord.getProcedureId(), e.getMessage());
                     return Mono.empty();
                 });
     }
 
-    private Mono<Void> sendExhaustionNotificationSafely(
-            String email,
-            String productSpecificationId,
-            String credentialId,
-            String providerEmail,
-            UUID procedureId,
-            String recipientType
-    ) {
-        if (email == null || email.isBlank()) {
-            log.warn("[NOTIFICATION] No {} email available for exhaustion notification, procedure: {}", recipientType, procedureId);
-            return Mono.empty();
-        }
-
-        return emailService.sendResponseUriExhausted(email, productSpecificationId, credentialId, providerEmail, appConfig.getKnowledgeBaseUploadCertificationGuideUrl())
-                .doOnSuccess(unused -> log.info("[NOTIFICATION] Exhaustion email sent to {} for procedure: {}, productSpecId: {}, credId: {}",
-                        recipientType, procedureId, productSpecificationId, credentialId))
-                .onErrorResume(e -> {
-                    log.error("[NOTIFICATION] Failed to send exhaustion email to {} for procedure: {}, productSpecId: {}, credId: {}: {}",
-                            recipientType, procedureId, productSpecificationId, credentialId, e.getMessage());
-                    return Mono.empty();
-                });
-    }
-
     // ──────────────────────────────────────────────────────────────────────
-    // Scheduler failure handling
+    // Private helpers
     // ──────────────────────────────────────────────────────────────────────
 
-    private Mono<Void> updateRetryAfterScheduledFailure(ProcedureRetry retryRecord) {
+    private Mono<Void> incrementAttemptCount(ProcedureRetry retryRecord) {
         return procedureRetryRepository.incrementAttemptCount(
                         retryRecord.getProcedureId(),
                         retryRecord.getActionType(),
@@ -374,10 +218,6 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                         retryRecord.getProcedureId(), rowsAffected))
                 .then();
     }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Retry spec and helpers
-    // ──────────────────────────────────────────────────────────────────────
 
     private Retry createRetrySpec(String operationName, int attempts, Duration[] delays) {
         validateRetryConfiguration(attempts, delays);
@@ -486,10 +326,10 @@ public class ProcedureRetryServiceImpl implements ProcedureRetryService {
                 || throwable instanceof WebClientRequestException;
     }
 
-    private Mono<LabelCredentialDeliveryPayload> deserializePayload(ProcedureRetry retryRecord) {
+    private <T> Mono<T> deserializePayload(ProcedureRetry retryRecord, Class<T> type) {
         return Mono.fromCallable(() -> {
                     try {
-                        return objectMapper.readValue(retryRecord.getPayload(), LabelCredentialDeliveryPayload.class);
+                        return objectMapper.readValue(retryRecord.getPayload(), type);
                     } catch (Exception e) {
                         log.error("[RETRY] Error deserializing retry payload for procedure {}: {}", retryRecord.getProcedureId(), e.getMessage(), e);
                         throw new RetryPayloadException("Failed to deserialize retry payload", e);
