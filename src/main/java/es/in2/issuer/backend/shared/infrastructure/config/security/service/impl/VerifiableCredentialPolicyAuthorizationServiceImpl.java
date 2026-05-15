@@ -278,7 +278,6 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
                 && equalsSafe(payloadMandator.organization(), tokenMandator.organization())
                 && equalsSafe(payloadMandator.country(), tokenMandator.country())
                 && equalsSafe(payloadMandator.commonName(), tokenMandator.commonName())
-                && equalsSafe(payloadMandator.serialNumber(), tokenMandator.serialNumber())
                 && payloadPowersOnlyIncludeProductOffering(mandate.power());
     }
 
