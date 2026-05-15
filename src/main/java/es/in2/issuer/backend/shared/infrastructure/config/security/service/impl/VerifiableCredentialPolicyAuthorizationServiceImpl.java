@@ -278,11 +278,17 @@ public class VerifiableCredentialPolicyAuthorizationServiceImpl implements Verif
                 && equalsSafe(payloadMandator.organization(), tokenMandator.organization())
                 && equalsSafe(payloadMandator.country(), tokenMandator.country())
                 && equalsSafe(payloadMandator.commonName(), tokenMandator.commonName())
+                && equalsOptional(payloadMandator.serialNumber(), tokenMandator.serialNumber())
                 && payloadPowersOnlyIncludeProductOffering(mandate.power());
     }
 
     private boolean equalsSafe(String a, String b) {
         return a != null && a.equals(b);
+    }
+
+    private boolean equalsOptional(String a, String b) {
+        if (a == null) return true;
+        return a.equals(b);
     }
 
     private Mono<Boolean> isLabelCredentialPolicyValid(LEARCredential learCredential, String idToken) {
