@@ -12,7 +12,7 @@ plugins {
 
 group = 'es.in2'
 
-version = '2.2.23'
+version = '2.2.24'
 
 java {
     sourceCompatibility = '17'
@@ -38,7 +38,7 @@ checkstyleTest {
 sonar {
     properties {
         property "sonar.projectName", "IN2 Issuer API"
-        property "sonar.projectKey", "in2workspace_in2-issuer-api"
+        property "sonar.projectKey", "in2workspace_in2-issuer-core-api"
         property "sonar.organization", "in2workspace"
         property "sonar.host.url", "https://sonarcloud.io"
         property "sonar.coverage.exclusions",
